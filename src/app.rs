@@ -30,7 +30,7 @@ pub fn App() -> impl IntoView {
         }
     });
 
-    let is_anonymous = Signal::derive(move || {
+    let _is_anonymous = Signal::derive(move || {
         match auth_context.user.read() {
             Some(Ok(u)) => u.anonymous,
             _ => true

@@ -7,7 +7,7 @@ use super::model::*;
 
 #[component]
 pub fn ItemListRow(item: BagItem) -> impl IntoView {
-    let auth_context = use_context::<AuthContext>().expect("Failed to get AuthContext");
+    let _auth_context = use_context::<AuthContext>().expect("Failed to get AuthContext");
     view! {
         <tr>
             <td>{item.id}</td>

@@ -1,5 +1,5 @@
 use cfg_if::cfg_if;
-use leptos::logging;
+
 use serde::{Deserialize, Serialize};
 cfg_if! {
     if #[cfg(feature="ssr")] {
