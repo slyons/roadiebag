@@ -1,13 +1,12 @@
 use cfg_if::cfg_if;
 use leptos::logging;
 use serde::{Deserialize, Serialize};
-
 cfg_if! {
     if #[cfg(feature="ssr")] {
         use sea_query_binder::SqlxBinder;
         #[cfg(feature="derive")]
         use sea_query::*;
-        use sea_query::{Query, Expr, Iden, Func, SqliteQueryBuilder, SelectStatement, Asterisk};
+        use sea_query::{Query, Expr, IdenStatic, Func, SqliteQueryBuilder, SelectStatement, Asterisk};
 
         use bcrypt::{hash, DEFAULT_COST};
         use sqlx::SqlitePool;
@@ -38,7 +37,20 @@ cfg_if! {
     if #[cfg(feature = "ssr")] {
         use async_trait::async_trait;
 
-        #[derive(Iden)]
+        /*use crate::db::FromRowPrefix;
+        impl<'r, R> FromRowPrefix<'r, R> for User
+        where R: Row{
+            fn from_row_prefix(row: &'r R, prefix: String) -> Result<Self, sqlx::Error> {
+                Ok(User {
+                    id: row.try_get(format!("`{}`.`{}`", prefix, "id"))?,
+                    username: row.try_get(format!("`{}`.`{}`", prefix, "username"))?,
+                    anonymous: false
+                })
+            }
+        }*/
+
+
+        #[derive(IdenStatic, Copy, Clone)]
         #[iden="users"]
         pub enum UserTable {
             Table,
@@ -65,19 +77,20 @@ cfg_if! {
         }
 
         impl SQLUser {
-            pub async fn create(username: String, password: String, pool: &SqlitePool) -> Result<(), sqlx::Error> {
-                let password_hashed = hash(password, DEFAULT_COST).unwrap();
+            pub async fn create<S: Into<String>>(username: S, password: S, pool: &SqlitePool) -> Result<i64, sqlx::Error> {
+                let password_hashed = hash(password.into(), DEFAULT_COST).unwrap();
 
                 let (insert_stmt, values) = Query::insert()
                     .into_table(UserTable::Table)
                     .columns([UserTable::Username, UserTable::Password])
-                    .values_panic([username.to_lowercase().into(), password_hashed.into()])
+                    .values_panic([username.into().to_lowercase().into(), password_hashed.into()])
                     .to_owned()
                     .build_sqlx(SqliteQueryBuilder);
-                sqlx::query_with(&insert_stmt, values)
+                let id = sqlx::query_with(&insert_stmt, values)
                     .execute(pool)
-                    .await?;
-                Ok(())
+                    .await?
+                    .last_insert_rowid();
+                Ok(id)
             }
 
             async fn get_one(mut query: SelectStatement, pool: &SqlitePool) -> Result<Option<Self>, sqlx::Error> {
@@ -115,7 +128,7 @@ cfg_if! {
                     .await
             }
 
-            pub async fn by_username(uname: &str, pool: &SqlitePool) -> Result<Option<SQLUser>, sqlx::Error> {
+            pub async fn by_username<S: Into<String>>(uname: S, pool: &SqlitePool) -> Result<Option<SQLUser>, sqlx::Error> {
                 logging::debug_warn!("by username");
                 Self::get_one(
                     Query::select()
@@ -125,7 +138,7 @@ cfg_if! {
                             Expr::expr(
                                 Func::lower(Expr::col(UserTable::Username))
                             )
-                            .eq(uname.trim().to_lowercase())
+                            .eq(uname.into().trim().to_lowercase())
                         )
                         .to_owned(),
                     pool
@@ -135,7 +148,9 @@ cfg_if! {
 
         }
 
-        #[derive(Iden)]
+
+
+        #[derive(IdenStatic, Copy, Clone)]
         #[iden="user_permissions"]
         pub enum UserPermissionsTable {
             Table,

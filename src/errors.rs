@@ -16,6 +16,8 @@ pub enum RoadieAppError {
     InternalServerError,
     #[error("Validation failed")]
     ValidationFailedError,
+    #[error("Validation failed for field {0}")]
+    ValidationFailedForField(String)
 }
 
 pub type RoadieResult<T> = Result<T, RoadieAppError>;
@@ -29,7 +31,8 @@ impl RoadieAppError {
             RoadieAppError::InternalServerError => {
                 StatusCode::INTERNAL_SERVER_ERROR
             },
-            RoadieAppError::ValidationFailedError => StatusCode::EXPECTATION_FAILED
+            RoadieAppError::ValidationFailedError => StatusCode::EXPECTATION_FAILED,
+            RoadieAppError::ValidationFailedForField(_) => StatusCode::EXPECTATION_FAILED
         }
     }
 }

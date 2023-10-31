@@ -4,6 +4,7 @@ use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
 use crate::auth::frontend::{AuthContext, AuthCard, CLogin, CSignup};
+use crate::bag::frontend::ItemList;
 use crate::auth::provide_auth;
 
 #[component]
@@ -58,7 +59,7 @@ pub fn App() -> impl IntoView {
         }>
             <main>
                 <Routes>
-                    <Route path="" view=HomePage/>
+                    <Route path="" view=ItemList/>
                     <Route path="/auth" view=CLogin/>
                     <Route path="/signup" view=CSignup />
                 </Routes>

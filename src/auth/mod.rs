@@ -3,6 +3,7 @@ use cfg_if::cfg_if;
 pub mod api;
 pub mod frontend;
 pub mod model;
+pub(crate) mod tests;
 pub use frontend::provide_auth;
 pub use model::User;
 

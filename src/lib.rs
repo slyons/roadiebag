@@ -1,13 +1,18 @@
+#![allow(dead_code)]
+
 use cfg_if::cfg_if;
 pub mod db;
 pub mod app;
 pub mod auth;
-pub mod bag;
 pub mod error_template;
 //pub mod fileserv;
 pub mod fallback;
 pub mod state;
 pub mod errors;
+pub mod bag;
+pub mod service;
+mod tests;
+mod telemetry;
 
 cfg_if! { if #[cfg(feature = "hydrate")] {
     use leptos::*;

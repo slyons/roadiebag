@@ -27,14 +27,14 @@ cfg_if! {
     }
 }
 
-#[server(GetUserAPI, "/api")]
+#[server(GetUserAPI, "/api", "Url", "get_user")]
 pub async fn get_user() -> Result<User, ServerFnError> {
     let auth = auth_session()?;
 
     Ok(auth.current_user.unwrap_or_default())
 }
 
-#[server(SignupAPI, "/api")]
+#[server(SignupAPI, "/api", "Url", "auth_signup")]
 pub async fn signup(
     username: String,
     password: String,
@@ -43,6 +43,16 @@ pub async fn signup(
     let pool = db_pool()?;
     let auth = auth_session()?;
     let response = expect_context::<ResponseOptions>();
+
+    if username.trim().len() == 0 {
+        response.set_status(StatusCode::BAD_REQUEST);
+        return Ok(Err(RoadieAppError::ValidationFailedForField("username".into())));
+    }
+
+    if password.trim().len() == 0 {
+        response.set_status(StatusCode::BAD_REQUEST);
+        return Ok(Err(RoadieAppError::ValidationFailedForField("password".into())));
+    }
 
     if password != password_confirmation {
         response.set_status(StatusCode::BAD_REQUEST);
@@ -59,7 +69,7 @@ pub async fn signup(
     Ok(Ok(()))
 }
 
-#[server(LoginAPI, "/api")]
+#[server(LoginAPI, "/api", "Url", "auth_login")]
 pub async fn login(
     username: String,
     password: String,
@@ -67,6 +77,7 @@ pub async fn login(
 ) -> Result<RoadieResult<User>, ServerFnError> {
     let pool = db_pool()?;
     let auth = auth_session()?;
+    let response = expect_context::<ResponseOptions>();
 
     if !auth.is_anonymous() {
         return Ok(Ok(auth.current_user.unwrap()))
@@ -84,19 +95,24 @@ pub async fn login(
                     Ok(Ok(u.into()))
                 }
                 Ok(false) => {
+                    response.set_status(StatusCode::UNAUTHORIZED);
                     Ok(Err(RoadieAppError::BadUserPassword))
                 }
                 Err(e) => {
                     logging::error!("BCrypt error: {:?}", e);
+                    response.set_status(StatusCode::INTERNAL_SERVER_ERROR);
                     Err(ServerFnError::ServerError("BCrypt error".to_string()))
                 }
             }
         },
-        None => Ok(Err(RoadieAppError::BadUserPassword))
+        None => {
+            response.set_status(StatusCode::UNAUTHORIZED);
+            Ok(Err(RoadieAppError::BadUserPassword))
+        }
     }
 }
 
-#[server(LogoutAPI, "/api")]
+#[server(LogoutAPI, "/api", "Url", "auth_logout")]
 pub async fn logout() -> Result<(), ServerFnError> {
     let auth = auth_session()?;
 
