@@ -68,7 +68,7 @@ pub fn ItemList() -> impl IntoView {
         }
     );
     let page_items = Signal::derive(move || {
-        page.read()
+        page()
             .map(|op| op.map(|pg| pg.items).unwrap_or(vec![]))
             .unwrap_or(vec![])
     });

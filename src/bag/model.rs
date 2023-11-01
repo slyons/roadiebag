@@ -74,20 +74,15 @@ cfg_if! {
     if #[cfg(feature="ssr")] {
         use sqlx::prelude::*;
         use sqlx::SqlitePool;
-        use sqlx::any::AnyQueryResult;
-        use futures::Future;
         use futures::future::try_join_all;
 
-        use crate::db::db_pool;
         use sea_query_binder::SqlxBinder;
         #[cfg(feature="derive")]
         use sea_query::*;
-        use sea_query::{Query, Expr, Iden, IdenStatic,
+        use sea_query::{Query, Expr, IdenStatic,
             Func, SqliteQueryBuilder, SelectStatement, Order, JoinType};
-        use sea_query::JoinType::Join;
         use sea_query::types::{Alias, Asterisk};
         use crate::auth::model::UserTable;
-        use crate::auth::auth_session;
         use rand::Rng;
         use leptos::logging;
 

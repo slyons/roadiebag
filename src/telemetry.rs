@@ -7,11 +7,11 @@ use tracing::subscriber::set_global_default;
 use tracing::Subscriber;
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_log::LogTracer;
-use tracing_subscriber::prelude::*;
+//use tracing_subscriber::prelude::*;
 use tracing_subscriber::fmt::MakeWriter;
-use tracing_subscriber::fmt::{self, format, time};
+use tracing_subscriber::fmt::time;
 use tracing_subscriber::{layer::SubscriberExt, EnvFilter, Registry};
-use tracing_logfmt;
+//use tracing_logfmt;
 
 // Compose multiple layers into a `tracing`'s subscriber.
 ///
@@ -75,7 +75,7 @@ pub fn get_subscriber<Sink>(
 
     Registry::default()
         .with(env_filter)
-        //.with(JsonStorageLayer)
+        .with(JsonStorageLayer)
         .with(formatting_layer)
 }
 
@@ -84,7 +84,6 @@ pub fn get_subscriber<Sink>(
 /// It should only be called once!
 pub fn init_subscriber(subscriber: impl Subscriber + Send + Sync) {
     let res = LogTracer::init();
-    println!("Res is {:?}", res);
     res.ok();
     set_global_default(subscriber).ok();
 }

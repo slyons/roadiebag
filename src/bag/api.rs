@@ -10,7 +10,7 @@ cfg_if! {
     if #[cfg(feature="ssr")] {
         use crate::auth::auth_session;
         use crate::db::db_pool;
-        use chrono::{DateTime, Utc};
+        use chrono::Utc;
         use http::status::StatusCode;
         use leptos_axum::ResponseOptions;
     }
@@ -121,8 +121,6 @@ pub async fn delete_bag_item(item_id: i64) -> Result<RoadieResult<()>, ServerFnE
 pub async fn list_bag_items(filter: Option<BagItemFilter>)
                             -> Result<RoadieResult<BagItemPage>, ServerFnError> {
     let pool = db_pool()?;
-    let auth = auth_session()?;
-    let response = expect_context::<ResponseOptions>();
 
     let page = BagItem::filter(filter.unwrap_or_default(), &pool).await?;
     Ok(Ok(page))

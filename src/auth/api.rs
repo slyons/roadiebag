@@ -43,7 +43,6 @@ pub async fn signup(
     password_confirmation: String
 ) -> Result<RoadieResult<()>, ServerFnError> {
     let pool = db_pool()?;
-    let auth = auth_session()?;
     let response = expect_context::<ResponseOptions>();
 
     if username.trim().len() == 0 {

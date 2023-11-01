@@ -3,8 +3,7 @@ use crate::errors::RoadieAppError;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
-use crate::auth::frontend::{AuthContext, AuthCard, CLogin, CSignup};
-use crate::bag::frontend::ItemList;
+use crate::auth::frontend::{AuthContext, AuthCard};
 use crate::auth::provide_auth;
 
 #[component]
@@ -31,7 +30,7 @@ pub fn App() -> impl IntoView {
     });
 
     let _is_anonymous = Signal::derive(move || {
-        match auth_context.user.read() {
+        match (auth_context.user)() {
             Some(Ok(u)) => u.anonymous,
             _ => true
         }

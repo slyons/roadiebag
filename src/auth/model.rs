@@ -10,8 +10,6 @@ cfg_if! {
 
         use bcrypt::{hash, DEFAULT_COST};
         use sqlx::SqlitePool;
-        use sqlx::Row;
-        use sqlx::prelude::*;
         use axum_session_auth::{Authentication, HasPermission};
     }
 }

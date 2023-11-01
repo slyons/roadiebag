@@ -18,18 +18,13 @@ cfg_if! {
 
         use leptos::*;
         use leptos_axum::{generate_route_list, LeptosRoutes, handle_server_fns_with_context};
-        use leptos::{logging::log, provide_context, get_configuration};
+        use leptos::{provide_context, get_configuration};
 
         use tower_http::trace::TraceLayer;
-        use log::Level;
-        use std::str::FromStr;
         use sqlx::{SqlitePool, sqlite::SqlitePoolOptions};
         use axum_session::{SessionConfig, SessionLayer, SessionStore};
         use axum_session_auth::{AuthSessionLayer, AuthConfig, SessionSqlitePool};
-        use dotenvy::dotenv;
         use std::env;
-        use std::net::SocketAddr;
-        use leptos::leptos_config::errors::LeptosConfigError;
 
         #[tracing::instrument(level = "info", fields(error))]
         async fn server_fn_handler(State(app_state): State<AppState>, auth_session: AuthSession,
@@ -112,7 +107,6 @@ cfg_if! {
         }
 
         pub fn get_app_state(pool: SqlitePool, options: LeptosOptions) -> AppState {
-            let addr = options.site_addr;
             let routes = generate_route_list(App);
             AppState {
                 leptos_options: options,
