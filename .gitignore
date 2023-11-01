@@ -18,3 +18,5 @@ playwright/.cache/
 .env
 /*.db
 /*.wal
+/*.db-shm
+/*.db-wal
