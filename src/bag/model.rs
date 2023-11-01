@@ -108,6 +108,7 @@ cfg_if! {
         }
 
         impl BagItem {
+            #[tracing::instrument(level = "info", skip_all, ret, err)]
             pub async fn insert(self, pool:&SqlitePool) -> Result<BagItem, sqlx::Error> {
                 let (insert_stmt, values) = Query::insert()
                     .into_table(BagItemsTable::Table)
@@ -143,6 +144,7 @@ cfg_if! {
                 })
             }
 
+            #[tracing::instrument(level = "info", skip_all, ret, err)]
             pub async fn update(&self, pool:&SqlitePool) -> Result<(), sqlx::Error> {
                 let (q, values) = Query::update()
                     .table(BagItemsTable::Table)
@@ -165,6 +167,7 @@ cfg_if! {
                 Ok(())
             }
 
+            #[tracing::instrument(level = "info", skip_all, fields(error), ret, err)]
             pub async fn delete(self, pool: &SqlitePool) -> Result<(), sqlx::Error> {
                 let (q, values) = Query::delete()
                     .from_table(BagItemsTable::Table)
@@ -200,11 +203,9 @@ cfg_if! {
                     .to_owned()
                     .build_sqlx(SqliteQueryBuilder);
 
-                logging::log!("Query is {:?}", q);
                 let result = sqlx::query_with(&q, values)
                     .fetch_all(pool)
                     .await?;
-                logging::log!("BI Result len is {}", result.len());
                     Ok(result.iter().map(|row| {
                         BagItem {
                             id: row.get(BagItemsTable::Id.as_str()),
@@ -224,6 +225,7 @@ cfg_if! {
                     }).collect())
             }
 
+            #[tracing::instrument(level = "info", skip(pool), fields(error), ret, err)]
             pub async fn by_id(id: i64, pool: &SqlitePool) -> Result<Option<BagItem>, sqlx::Error> {
                 logging::log!("Fetching Bag item id {}", id);
                 Self::get_one(
@@ -232,6 +234,7 @@ cfg_if! {
                     pool
                 ).await
             }
+
 
             pub async fn count(query: Option<SelectStatement>, pool: &SqlitePool) -> Result<u64, sqlx::Error> {
                 let mut query = query.unwrap_or(Query::select());
@@ -252,6 +255,7 @@ cfg_if! {
 
             }
 
+            #[tracing::instrument(level = "info", skip(pool), fields(error), ret, err)]
             pub async fn filter(filter: BagItemFilter, pool: &SqlitePool) -> Result<BagItemPage, sqlx::Error>{
                 let mut query = Query::select();
                 if let Some(added_by) = filter.added_by {
@@ -321,6 +325,7 @@ cfg_if! {
 
         impl TakenBagItem {
 
+            #[tracing::instrument(level = "info", skip(pool), fields(error), ret, err)]
             pub async fn get_random(pool: &SqlitePool) -> Result<Option<TakenBagItem>, sqlx::Error> {
                 let item_use_subquery = Query::select()
                     .from(TakenItemsTable::Table)
@@ -372,7 +377,6 @@ cfg_if! {
                 }
                 let mut rng = rand::thread_rng();
                 let item_offset = rng.gen_range(0..count);
-                logging::log!("{} items are eligible, picking number {}", count, item_offset);
 
                 let (q, v) = item_uses_left
                     .column(BagItemsTable::Id)
@@ -384,7 +388,6 @@ cfg_if! {
                     .fetch_one(pool)
                     .await?;
                 let item_id:i64 = result.get("id");
-                logging::log!("Selecting item ID {}", item_id);
                 let mut item = BagItem::by_id(item_id, pool).await?.expect(&format!("Invalid item ID {}", item_id));
                 if !item.infinite {
                     item.quantity -= 1;
@@ -396,6 +399,7 @@ cfg_if! {
                 Ok(Some(Self::insert(item_id, num_rounds, pool).await?))
             }
 
+            #[tracing::instrument(level = "info", skip(pool), fields(error), ret, err)]
             pub async fn insert(item_id: i64, num_rounds: i64, pool:&SqlitePool) -> Result<TakenBagItem, sqlx::Error> {
                 let (q, v) = Query::insert()
                     .into_table(TakenItemsTable::Table)
@@ -415,6 +419,7 @@ cfg_if! {
                     .unwrap())
             }
 
+            #[tracing::instrument(level = "info", skip(pool), fields(error), ret, err)]
             pub async fn update(&self, pool: &SqlitePool) -> Result<(), sqlx::Error> {
                 let (q, v) = Query::update()
                     .table(TakenItemsTable::Table)
@@ -433,6 +438,7 @@ cfg_if! {
                 Ok(())
             }
 
+            #[tracing::instrument(level = "info", skip(pool), fields(error), ret, err)]
             pub async fn by_id(id: i64, pool: &SqlitePool) -> Result<Option<Self>, sqlx::Error> {
                 Self::get_one(
                     Query::select()
@@ -474,6 +480,7 @@ cfg_if! {
                 tbis.await
             }
 
+            #[tracing::instrument(level = "info", skip(pool), fields(error), ret, err)]
             pub async fn for_item(item_id: i64, pool: &SqlitePool) -> Result<Vec<TakenBagItem>, sqlx::Error> {
                 Self::get_many(
                     Query::select()
@@ -484,6 +491,7 @@ cfg_if! {
                 ).await
             }
 
+            #[tracing::instrument(level = "info", skip(pool), fields(error), ret, err)]
             pub async fn last(pool: &SqlitePool) -> Result<Option<Self>, sqlx::Error> {
                 let tbi = Self::get_one(
                     Query::select()

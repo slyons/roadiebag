@@ -77,13 +77,14 @@ cfg_if! {
         }
 
         impl SQLUser {
-            pub async fn create<S: Into<String>>(username: S, password: S, pool: &SqlitePool) -> Result<i64, sqlx::Error> {
-                let password_hashed = hash(password.into(), DEFAULT_COST).unwrap();
+            #[tracing::instrument(level = "info", skip(password, pool), fields(error), ret, err)]
+            pub async fn create(username: String, password: String, pool: &SqlitePool) -> Result<i64, sqlx::Error> {
+                let password_hashed = hash(password, DEFAULT_COST).unwrap();
 
                 let (insert_stmt, values) = Query::insert()
                     .into_table(UserTable::Table)
                     .columns([UserTable::Username, UserTable::Password])
-                    .values_panic([username.into().to_lowercase().into(), password_hashed.into()])
+                    .values_panic([username.to_lowercase().into(), password_hashed.into()])
                     .to_owned()
                     .build_sqlx(SqliteQueryBuilder);
                 let id = sqlx::query_with(&insert_stmt, values)
@@ -94,7 +95,6 @@ cfg_if! {
             }
 
             async fn get_one(mut query: SelectStatement, pool: &SqlitePool) -> Result<Option<Self>, sqlx::Error> {
-                logging::debug_warn!("get one");
                 let mut user_vec = Self::get_many(query.limit(1).take(), pool).await?;
                 if user_vec.len() >= 1 {
                     Ok(Some(user_vec.remove(0)))
@@ -105,18 +105,13 @@ cfg_if! {
 
             async fn get_many(query: SelectStatement, pool: &SqlitePool) -> Result<Vec<SQLUser>, sqlx::Error> {
                 let (sql, values):(String, _) = query.build_sqlx(SqliteQueryBuilder);
-                logging::debug_warn!("User query is {:?}", &sql);
-                let result = sqlx::query_as_with::<_, SQLUser, _>(&sql, values)
+                sqlx::query_as_with::<_, SQLUser, _>(&sql, values)
                     .fetch_all(pool)
-                    .await;
-                result.map_err(|e| {
-                    logging::error!("Error when executing query: {:?}",e);
-                    e.into()
-                })
+                    .await
             }
 
+            #[tracing::instrument(level = "info", skip(pool), fields(error), err)]
             pub async fn by_id(id: i64, pool: &SqlitePool) -> Result<Option<SQLUser>, sqlx::Error> {
-                logging::debug_warn!("by id");
                 Self::get_one(
                     Query::select()
                         .column(Asterisk)
@@ -128,8 +123,8 @@ cfg_if! {
                     .await
             }
 
-            pub async fn by_username<S: Into<String>>(uname: S, pool: &SqlitePool) -> Result<Option<SQLUser>, sqlx::Error> {
-                logging::debug_warn!("by username");
+            #[tracing::instrument(level = "info", skip(pool), fields(error), err)]
+            pub async fn by_username(uname: String, pool: &SqlitePool) -> Result<Option<SQLUser>, sqlx::Error> {
                 Self::get_one(
                     Query::select()
                         .column(Asterisk)
@@ -138,7 +133,7 @@ cfg_if! {
                             Expr::expr(
                                 Func::lower(Expr::col(UserTable::Username))
                             )
-                            .eq(uname.into().trim().to_lowercase())
+                            .eq(uname.trim().to_lowercase())
                         )
                         .to_owned(),
                     pool
@@ -170,6 +165,7 @@ cfg_if! {
 
         #[async_trait]
         impl Authentication<User, i64, SqlitePool> for User {
+            #[tracing::instrument(level = "debug", fields(error), ret, err)]
             async fn load_user(userid: i64, pool: Option<&SqlitePool>) -> Result<User, anyhow::Error> {
                 let pool = pool.unwrap();
 

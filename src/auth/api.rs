@@ -27,6 +27,7 @@ cfg_if! {
     }
 }
 
+#[tracing::instrument(level = "info", fields(error), ret, err)]
 #[server(GetUserAPI, "/api", "Url", "get_user")]
 pub async fn get_user() -> Result<User, ServerFnError> {
     let auth = auth_session()?;
@@ -34,6 +35,7 @@ pub async fn get_user() -> Result<User, ServerFnError> {
     Ok(auth.current_user.unwrap_or_default())
 }
 
+#[tracing::instrument(level = "info", skip(password, password_confirmation), fields(error), ret, err)]
 #[server(SignupAPI, "/api", "Url", "auth_signup")]
 pub async fn signup(
     username: String,
@@ -59,7 +61,7 @@ pub async fn signup(
         return Ok(Err(RoadieAppError::PasswordsDoNotMatch));
     }
     
-    let existing_user = SQLUser::by_username(&username, &pool).await?;
+    let existing_user = SQLUser::by_username(username.clone(), &pool).await?;
     if existing_user.is_some() {
         response.set_status(StatusCode::BAD_REQUEST);
         return Ok(Err(RoadieAppError::BadUserPassword));
@@ -69,6 +71,7 @@ pub async fn signup(
     Ok(Ok(()))
 }
 
+#[tracing::instrument(level = "info", skip(password), fields(error), ret, err)]
 #[server(LoginAPI, "/api", "Url", "auth_login")]
 pub async fn login(
     username: String,
@@ -83,7 +86,7 @@ pub async fn login(
         return Ok(Ok(auth.current_user.unwrap()))
     }
 
-    let user = SQLUser::by_username(&username, &pool)
+    let user = SQLUser::by_username(username, &pool)
         .await?;
 
     match user {
@@ -112,6 +115,7 @@ pub async fn login(
     }
 }
 
+#[tracing::instrument(level = "info", fields(error), ret, err)]
 #[server(LogoutAPI, "/api", "Url", "auth_logout")]
 pub async fn logout() -> Result<(), ServerFnError> {
     let auth = auth_session()?;

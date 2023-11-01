@@ -9,7 +9,7 @@ cfg_if! {
             use crate::tests::tests::get_test_server;
             use crate::auth::tests::tests::create_test_user;
             use crate::errors::*;
-            use crate::bag::api::NewBagItem;
+            use crate::bag::api::*;
 
             use sqlx::SqlitePool;
             use sqlx::Row;
@@ -17,10 +17,13 @@ cfg_if! {
             use axum_test::TestServer;
             use chrono::prelude::*;
             use leptos::logging;
+            use leptos::prelude::*;
             use futures::StreamExt;
             use crate::bag::model::*;
+            use tracing::span;
+            use http::status::StatusCode;
 
-
+            #[tracing::instrument(level = "info", skip(pool), fields(error), err)]
             #[sqlx::test]
             async fn test_item_e2e(pool: SqlitePool) -> Result<()> {
                 let test_server = get_test_server(&pool).await?;
@@ -59,6 +62,7 @@ cfg_if! {
                 Ok(())
             }
 
+            #[tracing::instrument(level = "info", skip(pool), fields(error), err)]
             #[sqlx::test]
             async fn test_filter_pagination(pool: SqlitePool) -> Result<()> {
                 let test_server = get_test_server(&pool).await?;
@@ -141,6 +145,7 @@ cfg_if! {
                 Ok(())
             }
 
+            #[tracing::instrument(level = "info", skip(pool), fields(error), err)]
             #[sqlx::test]
             async fn test_item_random(pool: SqlitePool) -> Result<()> {
                 let test_server = get_test_server(&pool).await?;
@@ -174,27 +179,99 @@ cfg_if! {
                 Ok(())
             }
 
+            use serde_qs as qs;
+            use crate::bag::api::create_bag_item;
+
+            #[tracing::instrument(level = "info", skip(pool), fields(error), err)]
             #[sqlx::test]
             async fn test_bagitem_api(pool: SqlitePool) -> Result<()> {
                 let test_server = get_test_server(&pool).await?;
 
-                let bi = NewBagItem {
-                    description: "Some description".into(),
-                    name: "Some item".into(),
-                    infinite: false,
-                    quantity: 1,
-                    size: ItemSize::Large
+                let span = span!(tracing::Level::INFO, "test_bagitem_api").entered();
+                let bi = CreateBagItem {
+                    item: NewBagItem {
+                        description: "Some description".into(),
+                        name: "Some item".into(),
+                        infinite: false,
+                        quantity: 1,
+                        size: ItemSize::Large
+                    }
                 };
 
                 let response = test_server.post("/api/create_bag_item")
-                    .form(&bi)
+                    .text(qs::to_string(&bi)?)
+                    .content_type("application/x-www-form-urlencoded")
                     .await;
-                logging::log!("Response is {:?}", response);
-                let res:RoadieResult<BagItem> = response.json();
+                let res = response.json::<RoadieResult<BagItem>>();
                 assert_eq!(res, Err(RoadieAppError::Unauthorized));
 
-                //let test_user = create_test_user(&test_server, None).await;
+                let test_user = create_test_user(&test_server, None).await;
 
+                let response = test_server.post("/api/create_bag_item")
+                    .text(qs::to_string(&bi)?)
+                    .content_type("application/x-www-form-urlencoded")
+                    .await;
+                let res = response.json::<RoadieResult<BagItem>>();
+                let mut bag_item = res.unwrap();
+
+                assert_ne!(bag_item.id, -1);
+                bag_item.name = "Some other item".into();
+                let bi = UpdateBagItem {
+                    item: bag_item.clone()
+                };
+
+                let response = test_server.post("/api/update_bag_item")
+                    .text(qs::to_string(&bi)?)
+                    .content_type("application/x-www-form-urlencoded")
+                    .await;
+                let res = response.json::<RoadieResult<()>>();
+                assert_eq!(res.is_ok(), true);
+
+                let gbi = GetBagItem {
+                    item_id: bag_item.id
+                };
+                let response = test_server.post("/api/get_bag_item")
+                    .text(qs::to_string(&gbi)?)
+                    .content_type("application/x-www-form-urlencoded")
+                    .await;
+                tracing::info!("GetBagItem is {:?}", response);
+                let res = response.json::<RoadieResult<Option<BagItem>>>();
+                assert_eq!(res.is_ok(), true);
+                assert_eq!(response.status_code(), StatusCode::OK);
+
+                let gbi = GetBagItem {
+                    item_id: bag_item.id+1
+                };
+                let response = test_server.post("/api/get_bag_item")
+                    .text(qs::to_string(&gbi)?)
+                    .content_type("application/x-www-form-urlencoded")
+                    .await;
+                let res = response.json::<RoadieResult<Option<BagItem>>>();
+                assert_eq!(res.is_ok(), false);
+                assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
+
+                let di = DeleteBagItem {
+                    item_id: bag_item.id
+                };
+                let response = test_server.post("/api/delete_bag_item")
+                    .text(qs::to_string(&di)?)
+                    .content_type("application/x-www-form-urlencoded")
+                    .await;
+                let res = response.json::<RoadieResult<()>>();
+                assert_eq!(res.is_ok(), true);
+
+                let gbi = GetBagItem {
+                    item_id: bag_item.id
+                };
+                let response = test_server.post("/api/get_bag_item")
+                    .text(qs::to_string(&gbi)?)
+                    .content_type("application/x-www-form-urlencoded")
+                    .await;
+                let res = response.json::<RoadieResult<Option<BagItem>>>();
+                assert_eq!(res.is_ok(), false);
+                assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
+
+                span.exit();
                 Ok(())
             }
         }

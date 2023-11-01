@@ -22,10 +22,12 @@ pub(crate) mod tests {
     use http::StatusCode;
     use anyhow::*;
     use crate::tests::tests::get_test_server;
+    use std::result::Result::Ok;
 
+    #[tracing::instrument(level = "info", skip_all, err)]
     #[sqlx::test]
     async fn test_user_model(pool: SqlitePool) -> Result<()> {
-        let user_id = SQLUser::create("myuser", "mypassword", &pool).await?;
+        let user_id = SQLUser::create("myuser".into(), "mypassword".into(), &pool).await?;
 
         let (q, v) = Query::select()
             .from(UserTable::Table)
@@ -48,13 +50,13 @@ pub(crate) mod tests {
         let bad_user = SQLUser::by_id(user_id+1, &pool).await?;
         assert_eq!(bad_user.is_some(), false);
 
-        let user_by_name = SQLUser::by_username("myuser", &pool).await?;
+        let user_by_name = SQLUser::by_username("myuser".into(), &pool).await?;
         assert_eq!(user_by_name.is_some(), true);
         let user_by_name = user_by_name.unwrap();
         assert_eq!(user_by_name.id, user_id);
         assert_eq!(user_by_name.username, "myuser");
 
-        let bad_user_name = SQLUser::by_username("foo", &pool).await?;
+        let bad_user_name = SQLUser::by_username("foo".into(), &pool).await?;
         assert_eq!(bad_user_name.is_some(), false);
         Ok(())
     }
@@ -100,6 +102,7 @@ pub(crate) mod tests {
     }
 
 
+    #[tracing::instrument(level = "info", skip_all, err)]
     #[sqlx::test]
     async fn test_user_e2e(pool: SqlitePool) -> Result<()> {
         let test_server = get_test_server(&pool).await?;
@@ -153,6 +156,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
+    #[tracing::instrument(level = "info", skip_all, err)]
     #[sqlx::test]
     async fn test_bad_user(pool: SqlitePool) -> Result<()> {
         let test_server = get_test_server(&pool).await?;

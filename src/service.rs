@@ -80,7 +80,7 @@ cfg_if! {
                 init_subscriber(
                     get_subscriber_with_tracing(
                         "roadiebag".into(),
-                        "TRACE".into(),
+                        "INFO".into(),
                         std::io::stdout,
                     ).await);
             }
