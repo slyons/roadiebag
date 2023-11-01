@@ -45,9 +45,8 @@ pub fn App() -> impl IntoView {
         <Stylesheet id="leptos" href="/pkg/roadiebag.css"/>
 
         // sets the document title
-        <Title text="Welcome to Leptos"/>
+        <Title text="Welcome to Thunk's Roadie Bag"/>
 
-        <AuthCard />
         // content for this welcome page
         <Router fallback=|| {
             let mut outside_errors = Errors::default();
@@ -59,9 +58,7 @@ pub fn App() -> impl IntoView {
         }>
             <main>
                 <Routes>
-                    <Route path="" view=ItemList/>
-                    <Route path="/auth" view=CLogin/>
-                    <Route path="/signup" view=CSignup />
+                    <Route path="" view=RoadieBagPage/>
                 </Routes>
             </main>
         </Router>
@@ -70,13 +67,13 @@ pub fn App() -> impl IntoView {
 
 /// Renders the home page of your application.
 #[component]
-fn HomePage() -> impl IntoView {
-    // Creates a reactive value to update the button
-    let (count, set_count) = create_signal(0);
-    let on_click = move |_| set_count.update(|count| *count += 1);
+fn RoadieBagPage() -> impl IntoView {
+
 
     view! {
-        <h1>"Welcome to Leptos!"</h1>
-        <button on:click=on_click>"Click Me: " {count}</button>
+        <h1>"Thunk's Roadie Bag"</h1>
+        <div><AuthCard /></div>
+
+
     }
 }

@@ -76,7 +76,9 @@ pub fn CSignup() -> impl IntoView {
 }
 
 #[component]
-pub fn CLogin() -> impl IntoView {
+pub fn CLogin(
+    show_signup: RwSignal<bool>
+) -> impl IntoView {
     let auth_context = use_context::<AuthContext>().expect("Failed to get AuthContext");
     view! {
         <div>
@@ -99,6 +101,7 @@ pub fn CLogin() -> impl IntoView {
                 <br/>
                 <button type="submit" class="button">"Log In"</button>
             </ActionForm>
+            <button class="button" on:click=move |_| show_signup.set(true)>"Sign up"</button>
         </div>
     }
 }
@@ -106,6 +109,13 @@ pub fn CLogin() -> impl IntoView {
 #[component]
 pub fn AuthCard() -> impl IntoView {
     let auth_context = use_context::<AuthContext>().expect("Failed to get AuthContext");
+    let show_signup = create_rw_signal(false);
+
+    create_effect(move |_| {
+        auth_context.signup.version();
+        show_signup.set(false);
+    });
+
     let is_logged_in = Signal::derive(move || {
         match auth_context.user.get() {
             Some(Ok(u)) => !u.anonymous,
@@ -128,9 +138,11 @@ pub fn AuthCard() -> impl IntoView {
                         <button type="submit" class="button">"Log Out"</button>
                     </ActionForm>
                 </Show>
-                <Show when=move || !is_logged_in()>
-                    <a href="/auth">Login</a>
-                    <a href="/signup">Signup</a>
+                <Show when=move || !is_logged_in() && !show_signup()>
+                    <CLogin show_signup=show_signup />
+                </Show>
+                <Show when=move || !is_logged_in() && show_signup()>
+                    <CSignup />
                 </Show>
             </Transition>
         </div>

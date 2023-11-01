@@ -15,7 +15,7 @@ pub trait FromRowPrefix<'r, R>: Sized
 cfg_if! {
     if #[cfg(feature = "ssr")] {
         use sqlx::SqlitePool;
-
+        use leptos::{ServerFnError, use_context};
 
         pub fn db_pool() -> Result<SqlitePool, ServerFnError> {
            use_context::<SqlitePool>()
