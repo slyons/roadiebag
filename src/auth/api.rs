@@ -57,13 +57,13 @@ pub async fn signup(
 
     if password != password_confirmation {
         response.set_status(StatusCode::BAD_REQUEST);
-        return Ok(Err(RoadieAppError::PasswordsDoNotMatch));
+        return Ok(Err(RoadieAppError::ValidationFailedForField("password".into())));
     }
     
     let existing_user = SQLUser::by_username(username.clone(), &pool).await?;
     if existing_user.is_some() {
         response.set_status(StatusCode::BAD_REQUEST);
-        return Ok(Err(RoadieAppError::BadUserPassword));
+        return Ok(Err(RoadieAppError::ValidationFailedForField("username".into())));
     }
 
     SQLUser::create(username, password, &pool).await?;
