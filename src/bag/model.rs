@@ -1,14 +1,14 @@
 use serde::{Deserialize, Serialize};
 use cfg_if::cfg_if;
 use chrono::{DateTime, Utc};
-use strum::EnumIter;
+use strum::*;
 
 
 
 use crate::auth::User;
 use strum::Display;
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Debug, Copy, EnumIter, Display)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Debug, Copy, EnumIter, Display, EnumString, FromRepr)]
 pub enum ItemSize {
     Small,
     Medium,
@@ -66,7 +66,7 @@ pub struct BagItemPage {
     pub items: Vec<BagItem>,
     pub page_num: u64,
     pub total_pages: u64,
-    pub pagesize: u64,
+    pub page_size: u64,
     pub total_results: u64
 }
 
@@ -222,7 +222,6 @@ cfg_if! {
 
             #[tracing::instrument(level = "info", skip(pool), fields(error), ret, err)]
             pub async fn by_id(id: i64, pool: &SqlitePool) -> Result<Option<BagItem>, sqlx::Error> {
-                logging::log!("Fetching Bag item id {}", id);
                 Self::get_one(
                     Query::select()
                         .and_where(Expr::col((BagItemsTable::Table, BagItemsTable::Id)).eq(id)).to_owned(),
@@ -238,7 +237,6 @@ cfg_if! {
                     .expr_as(Expr::col(BagItemsTable::Id).count(), Alias::new("itemcount"))
                     .to_owned()
                     .build_sqlx(SqliteQueryBuilder);
-                logging::log!("Count query is {}", &q);
                 sqlx::query_with(&q, v)
                     .fetch_one(pool)
                     .await
@@ -269,10 +267,7 @@ cfg_if! {
                     query = query.and_where(Expr::col(BagItemsTable::Infinite).eq(infinite)).take();
                 }
                 let count = Self::count(Some(query.clone()), pool).await?;
-                logging::log!("Count is {}", count);
-                let page = filter.page_num.map(|page| {
-                    if page <= 0 {0} else {page - 1}
-                }).unwrap_or(0);
+                let page = filter.page_num.map(|page| page - 1).unwrap_or(0);
                 let page_size = filter.page_size.unwrap_or(50);
                 let offset:u64 = page * page_size;
                 query = query
@@ -282,8 +277,8 @@ cfg_if! {
                 let items = Self::get_many(query, pool).await?;
                 Ok(BagItemPage {
                     items: items,
-                    page_num: page,
-                    pagesize: page_size,
+                    page_num: page + 1,
+                    page_size: page_size,
                     total_pages: count.div_ceil(page_size),
                     total_results: count
                 })
