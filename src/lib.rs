@@ -11,6 +11,7 @@ pub mod bag;
 pub mod service;
 mod tests;
 mod telemetry;
+pub(crate) mod common;
 
 cfg_if! { if #[cfg(feature = "hydrate")] {
     use leptos::*;

@@ -1,11 +1,11 @@
 use leptos::*;
 
-
-use leptos_router::ActionForm;
+use leptos_router::*;
 use model::User;
 use crate::auth::model;
 use crate::auth::api::*;
-
+use crate::common::components::input::*;
+use crate::common::components::{AlertType, Alert};
 use crate::errors::RoadieResult;
 
 #[derive(Clone)]
@@ -43,108 +43,102 @@ pub fn provide_auth() {
 #[component]
 pub fn CSignup() -> impl IntoView {
     let auth_context = use_context::<AuthContext>().expect("Failed to get AuthContext");
-    view! {
-        <div>
-            <ActionForm action=auth_context.signup>
-                <h1>"Sign up"</h1>
-                <label>
-                    "User ID:"
-                    <input type="text" placeholder="User ID" maxlength="32" name="username" class="auth-input" />
-                </label>
-                <br/>
-                <label>
-                    "Password:"
-                    <input type="password" placeholder="Password" name="password" class="auth-input" />
-                </label>
-                <br/>
-                <label>
-                    "Confirm Password:"
-                    <input type="password" placeholder="Password again" name="password_confirmation" class="auth-input" />
-                </label>
-                <br/>
-                <label>
-                    "Remember me?"
-                    <input type="checkbox" name="remember" class="auth-input" />
-                </label>
-
-                <br/>
-                <button type="submit" class="button">"Sign Up"</button>
-
-            </ActionForm>
-        </div>
-    }
-}
-
-#[component]
-pub fn CLogin(
-    show_signup: RwSignal<bool>
-) -> impl IntoView {
-    let auth_context = use_context::<AuthContext>().expect("Failed to get AuthContext");
-    view! {
-        <div>
-            <ActionForm action=auth_context.login>
-                <h1>"Log In"</h1>
-                <label>
-                    "User ID:"
-                    <input type="text" placeholder="User ID" maxlength="32" name="username" class="auth-input" />
-                </label>
-                <br/>
-                <label>
-                    "Password:"
-                    <input type="password" placeholder="Password" name="password" class="auth-input" />
-                </label>
-                <br/>
-                <label>
-                    <input type="checkbox" name="remember" class="auth-input" />
-                    "Remember me?"
-                </label>
-                <br/>
-                <button type="submit" class="button">"Log In"</button>
-            </ActionForm>
-            <button class="button" on:click=move |_| show_signup.set(true)>"Sign up"</button>
-        </div>
-    }
-}
-
-#[component]
-pub fn AuthCard() -> impl IntoView {
-    let auth_context = use_context::<AuthContext>().expect("Failed to get AuthContext");
-    let show_signup = create_rw_signal(false);
+    let (signup_error, set_signup_error) = create_signal(None);
 
     create_effect(move |_| {
-        auth_context.signup.version();
-        show_signup.set(false);
-    });
-
-    let is_logged_in = Signal::derive(move || {
-        match auth_context.user.get() {
-            Some(Ok(u)) => !u.anonymous,
-            _ => false
+        match auth_context.signup.value().get() {
+            Some(Ok(Err(e))) => set_signup_error(Some(e.to_string())),
+            _ => set_signup_error(None)
         }
     });
-    let username = Signal::derive(move || {
-        match auth_context.user.get() {
-            Some(Ok(u)) if !u.anonymous => u.username,
-            _ => "Anonymous".to_string()
+
+    create_effect(move |_| {
+        match auth_context.signup.value().get() {
+            Some(Ok(Ok(_))) => use_navigate()("/auth", Default::default()),
+            _ => ()
+        };
+    });
+    view! {
+        <h2 class="text-2xl font-semibold mb-2 text-center">"Register"</h2>
+        <ActionForm action=auth_context.signup>
+
+            <div class="mb-4">
+                <InputText name="username" input_type="emailId" container_style="mt-4" label_title="Username" />
+                <InputText name="password" input_type="password" container_style="mt-4" label_title="Password" />
+                <InputText name="password_confirmation" input_type="password" container_style="mt-4" label_title="Password Confirmation" />
+            </div>
+            <Alert alert_type=AlertType::Error msg=signup_error />
+            <button type="submit" class="btn mt-2 w-full btn-primary">"Register"</button>
+
+            <div class="text-center mt-4">"Already have an account?" <A href="/auth"><span class="inline-block  hover:text-primary hover:underline hover:cursor-pointer transition duration-200 px-3">"Login"</span></A></div>
+        </ActionForm>
+    }
+}
+
+#[component]
+pub fn CLogin() -> impl IntoView {
+    let auth_context = use_context::<AuthContext>().expect("Failed to get AuthContext");
+    let (auth_error, set_auth_error) = create_signal(None);
+
+    create_effect(move |_| {
+        match auth_context.login.value().get() {
+            Some(Ok(Err(e))) => {
+                set_auth_error(Some(e.to_string()))
+            },
+            _ => set_auth_error(None)
+        }
+    });
+
+    create_effect(move |_| {
+        if let Some(Ok(Ok(_))) = auth_context.login.value().get() {
+            use_navigate()("/", Default::default());
         }
     });
 
     view! {
-        <div id="loginbox">
-            <Transition>
-                <Show when=is_logged_in>
-                    <div>You are logged in as {username()}</div>
-                    <ActionForm action=auth_context.logout>
-                        <button type="submit" class="button">"Log Out"</button>
-                    </ActionForm>
-                </Show>
-                <Show when=move || !is_logged_in() && !show_signup()>
-                    <CLogin show_signup=show_signup />
-                </Show>
-                <Show when=move || !is_logged_in() && show_signup()>
-                    <CSignup />
-                </Show>
-            </Transition>
+        <h2 class="text-2xl font-semibold mb-2 text-center">"Login"</h2>
+        <ActionForm action=auth_context.login>
+            <div class="mb-4">
+                <InputText name="username" input_type="emailId" container_style="mt-4" label_title="Username" />
+                <InputText name="password" input_type="password" container_style="mt-4" label_title="Password" />
+                <div class="form-control mt-4">
+                    <label class="label justify-center">
+                        <span class="label-text text-xs self-center">"Remember me?"</span>
+                    </label>
+                     <input type="checkbox" name="remember" class="checkbox input-xs self-center" />
+                </div>
+            </div>
+            <Alert alert_type=AlertType::Error msg=auth_error />
+
+            <button type="submit" class="btn mt-2 w-full btn-primary">"Login"</button>
+            <div class="text-center mt-4">"Don't have an account yet?" <A href="/auth/register"><span class="  inline-block  hover:text-primary hover:underline hover:cursor-pointer transition duration-200 px-3">"Register"</span></A></div>
+        </ActionForm>
+
+    }
+}
+
+#[component]
+pub fn AuthWrapper() -> impl IntoView {
+    view! {
+        <div class="min-h-screen bg-base-200 flex items-center">
+            <div class="card mx-auto w-full max-w-5xl  shadow-xl">
+                <div class="bg-base-100 rounded-xl">
+                    <div class="py-24 px-10 w-full">
+                        <Outlet />
+                    </div>
+                </div>
+            </div>
         </div>
+    }
+}
+
+#[component(transparent)]
+pub fn Auth() -> impl IntoView {
+
+    view! {
+        <Route path="/auth" view=AuthWrapper>
+            <Route path="/register" view=CSignup />
+            <Route path="" view=CLogin />
+        </Route>
     }
 }

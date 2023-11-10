@@ -23,13 +23,13 @@ pub fn ErrorTemplate(
     };
     // Get Errors from Signal
     let errors = errors.get_untracked();
-
+    println!("Errors: {errors:#?}");
     // Downcast lets us take a type that implements `std::error::Error`
     let errors: Vec<RoadieAppError> = errors
         .into_iter()
         .filter_map(|(_k, v)| v.downcast_ref::<RoadieAppError>().cloned())
         .collect();
-    println!("Errors: {errors:#?}");
+
 
     // Only the response code for the first error is actually sent from the server
     // this may be customized by the specific application

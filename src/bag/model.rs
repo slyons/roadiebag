@@ -13,7 +13,14 @@ pub enum ItemSize {
     Small,
     Medium,
     Large,
+    #[strum(disabled)]
     Unknown
+}
+
+impl Default for ItemSize {
+    fn default() -> Self {
+        Self::Unknown
+    }
 }
 
 impl From<u8> for ItemSize {
@@ -61,7 +68,22 @@ pub struct BagItemFilter {
     pub page_num: Option<u64>
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Debug)]
+impl BagItemFilter {
+    pub fn with_page(&self, page_num: u64) -> Self {
+        BagItemFilter {
+
+            page_num: Some(page_num),
+            added_by: self.added_by.clone(),
+            name: self.name.clone(),
+            description: self.description.clone(),
+            size: self.size.clone(),
+            infinite: self.infinite.clone(),
+            page_size: self.page_size.clone()
+        }
+    }
+}
+
+#[derive(Serialize, Default, Deserialize, PartialEq, Eq, Clone, Debug)]
 pub struct BagItemPage {
     pub items: Vec<BagItem>,
     pub page_num: u64,
@@ -84,7 +106,6 @@ cfg_if! {
         use sea_query::types::{Alias, Asterisk};
         use crate::auth::model::UserTable;
         use rand::Rng;
-        use leptos::logging;
 
         #[derive(IdenStatic, EnumIter, Copy, Clone)]
         #[iden="bagitems"]
@@ -362,7 +383,7 @@ cfg_if! {
                     .get::<i64, _>("itemcount")
                     .try_into()
                     .expect("Underflow");
-                if count <= 0 {
+                if count == 0 {
                     return Ok(None);
                 }
                 let mut rng = rand::thread_rng();

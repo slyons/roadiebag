@@ -16,8 +16,9 @@ cfg_if! {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct NewBagItem {
+#[derive(Clone, Default, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BagItemForm {
+    pub(crate) id: Option<i64>,
     pub(crate) name: String,
     pub(crate) description: String,
     pub(crate) quantity: i32,
@@ -25,15 +26,29 @@ pub struct NewBagItem {
     pub(crate) infinite: bool,
 }
 
+impl From<BagItem> for BagItemForm {
+    fn from(value: BagItem) -> Self {
+        BagItemForm {
+            id: Some(value.id),
+            name: value.name,
+            description: value.description,
+            quantity: value.quantity,
+            size: value.size,
+            infinite: value.infinite
+        }
+    }
+}
+
 #[tracing::instrument(level = "info", fields(error), ret, err)]
 #[server(CreateBagItem, "/api", "Url", "create_bag_item")]
-pub async fn create_bag_item(item: NewBagItem) -> Result<RoadieResult<BagItem>, ServerFnError> {
+pub async fn create_bag_item(item: BagItemForm) -> Result<RoadieResult<BagItem>, ServerFnError> {
     let pool = db_pool()?;
     let auth = auth_session()?;
     let response = expect_context::<ResponseOptions>();
 
     if auth.is_anonymous() {
         response.set_status(StatusCode::UNAUTHORIZED);
+        leptos_axum::redirect("/auth");
         Ok(Err(RoadieAppError::Unauthorized))
     } else {
         let bi = BagItem {
@@ -53,7 +68,7 @@ pub async fn create_bag_item(item: NewBagItem) -> Result<RoadieResult<BagItem>, 
 }
 #[tracing::instrument(level = "info", fields(error), ret, err)]
 #[server(UpdateBagItem, "/api", "Url", "update_bag_item")]
-pub async fn update_bag_item(item: BagItem) -> Result<RoadieResult<()>, ServerFnError> {
+pub async fn update_bag_item(item: BagItemForm) -> Result<RoadieResult<()>, ServerFnError> {
     let pool = db_pool()?;
     let auth = auth_session()?;
     let response = expect_context::<ResponseOptions>();
@@ -62,18 +77,31 @@ pub async fn update_bag_item(item: BagItem) -> Result<RoadieResult<()>, ServerFn
         response.set_status(StatusCode::UNAUTHORIZED);
         Ok(Err(RoadieAppError::Unauthorized))
     } else {
-        if item.id == -1 {
+        if item.id == Some(-1) || item.id.is_none() {
             Ok(Err(RoadieAppError::ValidationFailedError))
         } else {
-            item.update(&pool).await?;
-            Ok(Ok(()))
+            match BagItem::by_id(item.id.unwrap(), &pool).await? {
+                Some(mut e) => {
+                    e.name = item.name;
+                    e.description = item.description;
+                    e.infinite = item.infinite;
+                    e.quantity = item.quantity;
+                    e.size = item.size;
+                    e.update(&pool).await?;
+                    Ok(Ok(()))
+                },
+                None => {
+                    response.set_status(StatusCode::NOT_FOUND);
+                    Ok(Err(RoadieAppError::NotFound))
+                }
+            }
         }
     }
 }
 
 #[tracing::instrument(level = "info", fields(error), ret, err)]
 #[server(GetBagItem, "/api", "Url", "get_bag_item")]
-pub async fn get_bag_item(item_id: i64) -> Result<RoadieResult<Option<BagItem>>, ServerFnError> {
+pub async fn get_bag_item(item_id: i64) -> Result<RoadieResult<BagItem>, ServerFnError> {
     let pool = db_pool()?;
     let response = expect_context::<ResponseOptions>();
 
@@ -81,7 +109,7 @@ pub async fn get_bag_item(item_id: i64) -> Result<RoadieResult<Option<BagItem>>,
     match item {
         Some(bi) => {
             response.set_status(StatusCode::OK);
-            Ok(Ok(Some(bi)))
+            Ok(Ok(bi))
         },
         None => {
             response.set_status(StatusCode::NOT_FOUND);
