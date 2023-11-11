@@ -200,6 +200,7 @@ pub fn ItemListPagination(current_page:Resource<BagItemFilter, Option<BagItemPag
 
 #[component]
 pub fn ItemList() -> impl IntoView {
+    logging::log!("Item list time");
     let location = use_location();
     let query = create_memo(move |_| {
         location.search.with(|m| {

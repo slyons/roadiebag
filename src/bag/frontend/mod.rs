@@ -1,27 +1,63 @@
 mod list;
 mod addedit;
+mod current;
 
 use leptos::*;
-use leptos_router::{Route, Outlet};
-use crate::common::components::layout::Layout;
+use leptos_router::*;
+use crate::auth::frontend::{AuthContext};
+use crate::bag::api::{get_bag_item, BagItemForm};
 
 #[component]
-pub fn BagItemLayout() -> impl IntoView {
+pub fn BagRoutesOutlet() -> impl IntoView {
     view! {
-        <Layout>
-            <Outlet />
-        </Layout>
+        <Outlet />
     }
 }
 
+
+
 #[component(transparent)]
 pub fn BagRoutes() -> impl IntoView {
+    let auth_context = use_context::<AuthContext>().expect("Failed to get AuthContext");
+
+    let is_not_anonymous = Signal::derive(|| {
+        let ac = use_context::<AuthContext>().expect("Failed to get AuthContext");
+        let anon = if let Some(ur) = ac.user.get() {
+            !ur.unwrap_or_default().anonymous
+        } else {
+            false
+        };
+        logging::log!("Is User not anonymous? {}", anon);
+        anon
+    });
 
     view! {
-        <Route path="/" view=BagItemLayout>
-            <Route path="" view=list::ItemList />
-            <Route path="items/add" view=addedit::AddEditItem />
-            <Route path="items/edit/:id" view=addedit::AddEditItem />
-        </Route>
+        <ProtectedRoute
+            path="/"
+            view=BagRoutesOutlet
+            condition=is_not_anonymous
+            redirect_path="/auth"
+        >
+            <ProtectedRoute path=""
+                view=current::CurrentItem
+                condition=is_not_anonymous
+                redirect_path="/auth"
+            />
+            <ProtectedRoute path="items"
+                view=list::ItemList
+                condition=is_not_anonymous
+                redirect_path="/auth"
+            />
+            <ProtectedRoute path="items/add"
+                view=addedit::AddEditItem
+                condition=is_not_anonymous
+                redirect_path="/auth"
+            />
+            <ProtectedRoute path="items/edit/:id"
+                view=addedit::AddEditItem
+                condition=is_not_anonymous
+                redirect_path="/auth"
+            />
+        </ProtectedRoute>
     }
 }

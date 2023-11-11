@@ -75,6 +75,7 @@ pub async fn update_bag_item(item: BagItemForm) -> Result<RoadieResult<()>, Serv
 
     if auth.is_anonymous() {
         response.set_status(StatusCode::UNAUTHORIZED);
+        leptos_axum::redirect("/auth");
         Ok(Err(RoadieAppError::Unauthorized))
     } else {
         if item.id == Some(-1) || item.id.is_none() {
@@ -103,17 +104,24 @@ pub async fn update_bag_item(item: BagItemForm) -> Result<RoadieResult<()>, Serv
 #[server(GetBagItem, "/api", "Url", "get_bag_item")]
 pub async fn get_bag_item(item_id: i64) -> Result<RoadieResult<BagItem>, ServerFnError> {
     let pool = db_pool()?;
+    let auth = auth_session()?;
     let response = expect_context::<ResponseOptions>();
 
-    let item = BagItem::by_id(item_id, &pool).await?;
-    match item {
-        Some(bi) => {
-            response.set_status(StatusCode::OK);
-            Ok(Ok(bi))
-        },
-        None => {
-            response.set_status(StatusCode::NOT_FOUND);
-            Ok(Err(RoadieAppError::NotFound))
+    if auth.is_anonymous() {
+        response.set_status(StatusCode::UNAUTHORIZED);
+        leptos_axum::redirect("/auth");
+        Ok(Err(RoadieAppError::Unauthorized))
+    } else {
+        let item = BagItem::by_id(item_id, &pool).await?;
+        match item {
+            Some(bi) => {
+                response.set_status(StatusCode::OK);
+                Ok(Ok(bi))
+            },
+            None => {
+                response.set_status(StatusCode::NOT_FOUND);
+                Ok(Err(RoadieAppError::NotFound))
+            }
         }
     }
 }
@@ -127,6 +135,7 @@ pub async fn delete_bag_item(item_id: i64) -> Result<RoadieResult<()>, ServerFnE
 
     if auth.is_anonymous() {
         response.set_status(StatusCode::UNAUTHORIZED);
+        leptos_axum::redirect("/auth");
         Ok(Err(RoadieAppError::Unauthorized))
     } else {
         let item = BagItem::by_id(item_id, &pool).await?;
@@ -150,8 +159,17 @@ pub async fn list_bag_items(filter: Option<BagItemFilter>)
                             -> Result<RoadieResult<BagItemPage>, ServerFnError> {
     let pool = db_pool()?;
 
-    let page = BagItem::filter(filter.unwrap_or_default(), &pool).await?;
-    Ok(Ok(page))
+    let auth = auth_session()?;
+    let response = expect_context::<ResponseOptions>();
+
+    if auth.is_anonymous() {
+        response.set_status(StatusCode::UNAUTHORIZED);
+        leptos_axum::redirect("/auth");
+        Ok(Err(RoadieAppError::Unauthorized))
+    } else {
+        let page = BagItem::filter(filter.unwrap_or_default(), &pool).await?;
+        Ok(Ok(page))
+    }
 }
 
 
@@ -164,6 +182,7 @@ pub async fn take_random() -> Result<RoadieResult<Option<TakenBagItem>>, ServerF
 
     if auth.is_anonymous() {
         response.set_status(StatusCode::UNAUTHORIZED);
+        leptos_axum::redirect("/auth");
         Ok(Err(RoadieAppError::Unauthorized))
     } else {
         Ok(Ok(TakenBagItem::get_random(&pool).await?))
@@ -179,6 +198,7 @@ pub async fn update_taken(taken_item: TakenBagItem) -> Result<RoadieResult<()>, 
 
     if auth.is_anonymous() {
         response.set_status(StatusCode::UNAUTHORIZED);
+        leptos_axum::redirect("/auth");
         Ok(Err(RoadieAppError::Unauthorized))
     } else {
         Ok(Ok(taken_item.update(&pool).await?))
@@ -194,6 +214,7 @@ pub async fn last_taken() -> Result<RoadieResult<Option<TakenBagItem>>, ServerFn
 
     if auth.is_anonymous() {
         response.set_status(StatusCode::UNAUTHORIZED);
+        leptos_axum::redirect("/auth");
         Ok(Err(RoadieAppError::Unauthorized))
     } else {
         let item = TakenBagItem::last(&pool).await?;
@@ -210,6 +231,7 @@ pub async fn for_item(item_id: i64) -> Result<RoadieResult<Vec<TakenBagItem>>, S
 
     if auth.is_anonymous() {
         response.set_status(StatusCode::UNAUTHORIZED);
+        leptos_axum::redirect("/auth");
         Ok(Err(RoadieAppError::Unauthorized))
     } else {
         let items = TakenBagItem::for_item(item_id, &pool).await?;

@@ -7,23 +7,33 @@ use crate::auth::frontend::AuthContext;
 pub fn Avatar() -> impl IntoView {
     let auth_context = use_context::<AuthContext>().expect("Failed to get AuthContext");
 
-    let user_first_letter = Signal::derive(move || match auth_context.user.get(){
-        Some(Ok(u)) if !u.anonymous => u.username.chars().nth(0).unwrap().to_ascii_uppercase().to_string(),
-        Some(Ok(u)) => "".to_string(),
-        _ => "".to_string()
+    let user_first_letter = Signal::derive(move ||
+        use_context::<AuthContext>().expect("Failed to get AuthContext")
+            .user_first_letter());
+    let show_avatar = Signal::derive(move || {
+        let ac = use_context::<AuthContext>().expect("Failed to get AuthContext");
+        if let Some(ur) = ac.user.get() {
+            !ur.unwrap_or_default().anonymous
+        } else {
+            false
+        }
     });
 
     view! {
-        <div className="dropdown dropdown-end ml-4">
-            <ActionForm action=auth_context.logout>
-                <div class="avatar placeholder">
-                  <div class="bg-neutral-focus text-neutral-content rounded-full w-12">
-                    <span>{user_first_letter}</span>
-                  </div>
-                  <button type="submit" class="btn btn-xs self-center">"Log Out"</button>
+        <Transition fallback=SuspenseContent>
+            <Show when=show_avatar>
+                <div className="dropdown dropdown-end ml-4">
+                    <ActionForm action=auth_context.logout>
+                        <div class="avatar placeholder">
+                          <div class="bg-neutral-focus text-neutral-content rounded-full w-12">
+                            <span>{user_first_letter}</span>
+                          </div>
+                          <button type="submit" class="btn btn-xs self-center">"Log Out"</button>
+                        </div>
+                    </ActionForm>
                 </div>
-            </ActionForm>
-        </div>
+            </Show>
+        </Transition>
     }
 }
 
@@ -37,8 +47,8 @@ pub fn Header() -> impl IntoView {
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16" /></svg>
               </label>
               <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52">
-                <li><A exact=true href="/">"Item List"</A></li>
-                <li><A exact=true href="/items/current">"Current Item"</A></li>
+                <li><A exact=true href="/items">"Item List"</A></li>
+                <li><A exact=true href="/">"Current Item"</A></li>
                 <li><A exact=true href="/items/add">"Add Item"</A></li>
               </ul>
             </div>
@@ -46,8 +56,8 @@ pub fn Header() -> impl IntoView {
           </div>
           <div class="navbar-center hidden lg:flex">
             <ul class="menu menu-horizontal px-1">
-                <li><A exact=true href="/">"Item List"</A></li>
-                <li><A exact=true href="/items/current">"Current Item"</A></li>
+                <li><A exact=true href="/items">"Item List"</A></li>
+                <li><A exact=true href="/">"Current Item"</A></li>
                 <li><A exact=true href="/items/add">"Add Item"</A></li>
             </ul>
           </div>
@@ -86,9 +96,12 @@ pub fn PageContent(children: ChildrenFn) -> impl IntoView {
 pub fn Layout(children: ChildrenFn) -> impl IntoView {
     //let sidebar_signal = create_rw_signal(false);
     //provide_context(sidebar_signal);
+    let children = store_value(children);
     view! {
         <PageContent>
-            {children()}
+            <Transition fallback=SuspenseContent>
+                {children.with_value(|children| children())}
+            </Transition>
         </PageContent>
     }
 }

@@ -25,7 +25,7 @@ impl Default for User {
     fn default() -> Self {
         Self {
             id: -1,
-            username: "Guest".into(),
+            username: "Anonymous".into(),
             anonymous: true
         }
     }

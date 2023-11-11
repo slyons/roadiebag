@@ -3,29 +3,25 @@ use leptos::ev::SubmitEvent;
 use leptos_router::*;
 use crate::common::components::input::*;
 use crate::common::components::{AlertType, Alert};
+use crate::common::create_resource_slice;
 use std::str::FromStr;
 use strum::*;
 
 use crate::bag::api::*;
 use crate::bag::model::*;
 
-#[derive(Params, PartialOrd, PartialEq, Debug, Copy, Clone)]
-struct AddEditParams {
+#[derive(Params, Default, PartialOrd, PartialEq, Debug, Copy, Clone)]
+pub struct AddEditParams {
     id: Option<i64>
 }
 
 #[component]
 pub fn AddEditItem() -> impl IntoView {
     let params = use_params::<AddEditParams>();
-    let state = create_rw_signal(BagItemForm::default());
-
-    create_effect(move |_| {
-        logging::log!("Params is {:?}", params.get());
-    });
 
     // TODO: Have better handling for items that 404
     let item_loader = create_resource(
-        params,
+        move || { logging::log!("Params are {:?}", params.get()); params.get()},
         move |p| async move{
             if let Ok(p) = p {
                 if let Some(id) = p.id {
@@ -33,71 +29,98 @@ pub fn AddEditItem() -> impl IntoView {
                                 .expect("Server error")
                                 .expect("Item not found")
                                 .into();
-                    state.set(bif);
+
+                    logging::log!("Loaded item {:?}", bif);
+                    bif
                 } else {
-                    state.set(BagItemForm::default());
+                    logging::log!("Loading default item");
+                    BagItemForm::default()
                 }
             } else {
                 logging::error!("Unable to parse params");
                 use_navigate()("/", Default::default());
+                BagItemForm::default()
             }
         }
     );
 
-    provide_context(state);
+    provide_context(item_loader);
     view! {
         <ItemForm />
     }
 }
 
-/*#[component]
-pub fn EditItem() -> impl IntoView {
-    let params = use_params::<AddEditParams>();
-}*/
-
 #[component]
 pub fn ItemForm() -> impl IntoView {
-    let state = expect_context::<RwSignal<BagItemForm>>();
+    let state = expect_context::<Resource<Result<AddEditParams, ParamsError>, BagItemForm>>();
     let (submit_error, set_submit_error) = create_signal(None);
 
-    let item_id = Signal::derive(move || {
-        state.with(|s| s.id.unwrap_or(-1))
-    });
+    /*let submit_text = Signal::derive(move || {
+        let text = if let Some(s) = state.get() {
+            if s.id.is_some() {
+                "Update".to_string()
+            } else {
+                "Create".to_string()
+            }
+        } else {
+            "".to_string()
+        };
 
-    let (name, set_name) = create_slice(
+        logging::log!("Loading is {:?} State is {:?} and text is {}", state.loading().get(), state(), text);
+        text
+    });*/
+
+    let (submit_text, _set_id) = create_resource_slice(
         state,
-        |state| state.name.clone(),
-        |state, n| state.name = n
+        |state| state.as_ref().map(|s| {
+            logging::log!("State is {:?}", state);
+            if s.id.is_some() {
+                "Update".to_string()
+            } else {
+                "Create".to_string()
+            }
+        }).unwrap_or_default(),
+        |state, n:String| ()
     );
 
-    let (desc, set_desc) = create_slice(
+    let (name, set_name) = create_resource_slice(
         state,
-        |state| state.description.clone(),
-        |state, n| state.description = n
+        |state| state.as_ref().map(|s| s.name.clone()).unwrap_or_default(),
+
+        |state, n| {state.as_mut().map(|mut s| s.name = n);}
     );
 
-    let (quantity, set_quantity) = create_slice(
+    let (desc, set_desc) = create_resource_slice(
         state,
-        |state| state.quantity.to_string(),
+        |state| state.as_ref().map(|s| s.description.clone()).unwrap_or_default(),
+        |state, n| { state.as_mut().map(|mut s| s.description = n);}
+    );
+
+    let (quantity, set_quantity) = create_resource_slice(
+        state,
+        |state| state.as_ref().map(|s| s.quantity.to_string()).unwrap_or_default(),
         |state, n:String| {
             if !n.is_empty() {
-                state.quantity=n.parse().expect("Unable to parse integer")
+                state.as_mut().map(|mut s| s.quantity=n.parse().expect("Unable to parse integer"));
             }
         }
     );
 
-    let (size, set_size) = create_slice(
+    let (size, set_size) = create_resource_slice(
         state,
         |state| {
-            if state.size == ItemSize::Unknown {
-                None
-            } else {
-                Some(state.size.to_string())
-            }
+            state.as_ref().and_then(|s| {
+                if s.size == ItemSize::Unknown {
+                    None
+                } else {
+                    Some(s.size.to_string())
+                }
+            })
         },
         |state, n:Option<String>| {
             if let Some(i) = n {
-                state.size = ItemSize::from_str(&i).expect("Item size parse failure");
+                state.as_mut().map(|mut s|
+                        s.size = ItemSize::from_str(&i).expect("Item size parse failure"));
             }
         }
     );
@@ -105,20 +128,14 @@ pub fn ItemForm() -> impl IntoView {
         .map(|variant| (variant.to_string(), variant.to_string()))
         .collect::<Vec<(String, String)>>();
 
-    let (infinite, set_infinite) = create_slice(
+    let (infinite, set_infinite) = create_resource_slice(
         state,
-        |state| state.infinite,
-        |state, n| state.infinite = n
+        |state| state.as_ref().map(|s| s.infinite).unwrap_or_default(),
+        |state, n| {state.as_mut().map(|mut s| s.infinite = n);}
     );
 
 
-    let submit_text = Signal::derive(move || {
-        if state().id.is_some() {
-            "Update".to_string()
-        } else {
-            "Create".to_string()
-        }
-    });
+
 
     let submit_action = create_action(move |input: &BagItemForm| {
         let input = input.to_owned();
@@ -161,7 +178,7 @@ pub fn ItemForm() -> impl IntoView {
             set_submit_error(Some("You must specify an item name".into()));
         }
         if quantity.get().trim().len() == 0 {
-            set_submit_error(Some("You must specify an item name".into()));
+            set_submit_error(Some("You must specify a quantity".into()));
 
         } else {
             let q = quantity.get();
@@ -178,7 +195,7 @@ pub fn ItemForm() -> impl IntoView {
         }
 
         if submit_error.get().is_none() {
-            submit_action.dispatch(state.get());
+            submit_action.dispatch(state.get().unwrap());
         }
     };
 
@@ -188,7 +205,7 @@ pub fn ItemForm() -> impl IntoView {
                 <div class="bg-base-100 rounded-xl">
                     <div class="py-24 px-10 w-full">
                         <form on:submit=on_submit>
-                            <h2 class="text-2xl font-semibold mb-2 text-center">{format!("{} Item", submit_text())}</h2>
+                            <h2 class="text-2xl font-semibold mb-2 text-center">{move || format!("{} Item", submit_text())}</h2>
                             <InputControlled
                                 input_type="text"
                                 field_name="name"
@@ -225,7 +242,7 @@ pub fn ItemForm() -> impl IntoView {
                                 value=infinite
                                 set_value=set_infinite />
                             <Alert alert_type=AlertType::Error msg=submit_error />
-                            <button type="submit" class="btn mt-2 w-full btn-primary">{submit_text()}</button>
+                            <button type="submit" class="btn mt-2 w-full btn-primary">{move || submit_text()}</button>
                         </form>
                     </div>
                 </div>
