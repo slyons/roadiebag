@@ -83,11 +83,11 @@ pub fn CSignup() -> impl IntoView {
         <ActionForm action=auth_context.signup>
 
             <div class="mb-4">
-                <InputText name="username" input_type="emailId" container_style="mt-4" label_title="Username" />
-                <InputText name="password" input_type="password" container_style="mt-4" label_title="Password" />
-                <InputText name="password_confirmation" input_type="password" container_style="mt-4" label_title="Password Confirmation" />
+                <InputText field_name="username" input_type="emailId" container_style="mt-4" field_label="Username" />
+                <InputText field_name="password" input_type="password" container_style="mt-4" field_label="Password" />
+                <InputText field_name="password_confirmation" input_type="password" container_style="mt-4" field_label="Password Confirmation" />
             </div>
-            <Alert alert_type=AlertType::Error msg=signup_error />
+            <Alert alert_type="Error".into() msg=signup_error.into_signal() />
             <button type="submit" class="btn mt-2 w-full btn-primary">"Register"</button>
 
             <div class="text-center mt-4">"Already have an account?" <A href="/auth"><span class="inline-block  hover:text-primary hover:underline hover:cursor-pointer transition duration-200 px-3">"Login"</span></A></div>
@@ -119,8 +119,8 @@ pub fn CLogin() -> impl IntoView {
         <h2 class="text-2xl font-semibold mb-2 text-center">"Login"</h2>
         <ActionForm action=auth_context.login>
             <div class="mb-4">
-                <InputText name="username" input_type="emailId" container_style="mt-4" label_title="Username" />
-                <InputText name="password" input_type="password" container_style="mt-4" label_title="Password" />
+                <InputText field_name="username" input_type="emailId" container_style="mt-4" field_label="Username" />
+                <InputText field_name="password" input_type="password" container_style="mt-4" field_label="Password" />
                 <div class="form-control mt-4">
                     <label class="label justify-center">
                         <span class="label-text text-xs self-center">"Remember me?"</span>
@@ -128,7 +128,7 @@ pub fn CLogin() -> impl IntoView {
                      <input type="checkbox" name="remember" class="checkbox input-xs self-center" />
                 </div>
             </div>
-            <Alert alert_type=AlertType::Error msg=auth_error />
+            <Alert alert_type="Error".into() msg=auth_error.into_signal() />
 
             <button type="submit" class="btn mt-2 w-full btn-primary">"Login"</button>
             <div class="text-center mt-4">"Don't have an account yet?" <A href="/auth/register"><span class="  inline-block  hover:text-primary hover:underline hover:cursor-pointer transition duration-200 px-3">"Register"</span></A></div>

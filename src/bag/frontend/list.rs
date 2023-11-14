@@ -220,7 +220,9 @@ pub fn ItemList() -> impl IntoView {
         query,
         |filter| async move {
             match list_bag_items(Some(filter)).await {
-                Ok(Ok(page)) => Some(page),
+                Ok(Ok(page)) => {
+                    Some(page)
+                },
                 _ => None
             }
         }

@@ -5,10 +5,13 @@ use crate::common::components::input::*;
 use crate::common::components::{AlertType, Alert};
 use crate::common::create_resource_slice;
 use std::str::FromStr;
+use std::collections::HashMap;
 use strum::*;
 
 use crate::bag::api::*;
 use crate::bag::model::*;
+use crate::errors::{RoadieAppError, RoadieResult};
+use crate::error_template::ErrorTemplate;
 
 #[derive(Params, Default, PartialOrd, PartialEq, Debug, Copy, Clone)]
 pub struct AddEditParams {
@@ -17,127 +20,130 @@ pub struct AddEditParams {
 
 #[component]
 pub fn AddEditItem() -> impl IntoView {
-    let params = use_params::<AddEditParams>();
-
-    // TODO: Have better handling for items that 404
-    let item_loader = create_resource(
-        move || { logging::log!("Params are {:?}", params.get()); params.get()},
-        move |p| async move{
-            if let Ok(p) = p {
-                if let Some(id) = p.id {
-                    let bif = get_bag_item(id).await
-                                .expect("Server error")
-                                .expect("Item not found")
-                                .into();
-
-                    logging::log!("Loaded item {:?}", bif);
-                    bif
-                } else {
-                    logging::log!("Loading default item");
-                    BagItemForm::default()
-                }
-            } else {
-                logging::error!("Unable to parse params");
-                use_navigate()("/", Default::default());
-                BagItemForm::default()
-            }
-        }
-    );
-
-    provide_context(item_loader);
     view! {
-        <ItemForm />
+        <ItemForm editable=true/>
     }
 }
 
 #[component]
-pub fn ItemForm() -> impl IntoView {
-    let state = expect_context::<Resource<Result<AddEditParams, ParamsError>, BagItemForm>>();
-    let (submit_error, set_submit_error) = create_signal(None);
+pub fn ItemForm(editable: bool) -> impl IntoView {
+    let params = use_params::<AddEditParams>();
+    let (submit_error, set_submit_error) =
+        create_signal(HashMap::new());
+    let action = create_server_action::<CreateUpdateBagItem>();
 
-    /*let submit_text = Signal::derive(move || {
-        let text = if let Some(s) = state.get() {
-            if s.id.is_some() {
-                "Update".to_string()
+    let item_loader = create_resource(
+        move || params.get(),
+        move |p| async move{
+            if let Ok(p) = p {
+                if let Some(id) = p.id {
+                    match get_bag_item(id).await {
+                        Ok(Err(RoadieAppError::MultipleErrors(e))) => set_submit_error(e),
+                        Err(e) => {
+                            set_submit_error.update(|m| {m.insert("other".to_string(), e.to_string());});
+                        },
+                        Ok(Err(e)) => {
+                            set_submit_error.update(|m| {m.insert("other".to_string(), e.to_string());});
+                        },
+                        Ok(Ok(bif)) => {
+                            let bif:BagItemForm = bif.into();
+                            logging::log!("Loaded item {:?}", bif);
+                            action.value().set(Some(Ok(Ok(bif))));
+                        }
+                    };
+                } else {
+                    logging::log!("Loading default item");
+                    action.value().try_set(Some(Ok(Ok(BagItemForm::default()))));
+
+                }
             } else {
-                "Create".to_string()
+                logging::error!("Unable to parse params");
+                use_navigate()("/items", Default::default());
+            }
+        }
+    );
+
+    let submit_text = move || {
+        action.pending().track();
+        if let Some(Ok(Ok(r))) = action.value().get() {
+            if r.id == -1 {
+                "Create Item".to_string()
+            } else {
+                "Update Item".to_string()
             }
         } else {
             "".to_string()
-        };
+        }
+    };
 
-        logging::log!("Loading is {:?} State is {:?} and text is {}", state.loading().get(), state(), text);
-        text
-    });*/
-
-    let (submit_text, _set_id) = create_resource_slice(
-        state,
-        |state| state.as_ref().map(|s| {
-            logging::log!("State is {:?}", state);
-            if s.id.is_some() {
-                "Update".to_string()
-            } else {
-                "Create".to_string()
-            }
-        }).unwrap_or_default(),
-        |state, n:String| ()
+    /*let (item_id, _set_item_id) = create_slice(
+        current_item,
+        |ci| ci.map(|c| c.id),
+        |_ci, _v| ()
     );
 
-    let (name, set_name) = create_resource_slice(
-        state,
-        |state| state.as_ref().map(|s| s.name.clone()).unwrap_or_default(),
+    let (name, set_name) = create_slice(
+        current_item,
+        |ci| ci.map(|c| c.name),
 
-        |state, n| {state.as_mut().map(|mut s| s.name = n);}
-    );
-
-    let (desc, set_desc) = create_resource_slice(
-        state,
-        |state| state.as_ref().map(|s| s.description.clone()).unwrap_or_default(),
-        |state, n| { state.as_mut().map(|mut s| s.description = n);}
-    );
-
-    let (quantity, set_quantity) = create_resource_slice(
-        state,
-        |state| state.as_ref().map(|s| s.quantity.to_string()).unwrap_or_default(),
-        |state, n:String| {
-            if !n.is_empty() {
-                state.as_mut().map(|mut s| s.quantity=n.parse().expect("Unable to parse integer"));
+        |ci, n| {
+            if let Ok(ci) = ci {
+                ci.name = n;
             }
         }
     );
 
-    let (size, set_size) = create_resource_slice(
-        state,
-        |state| {
-            state.as_ref().and_then(|s| {
-                if s.size == ItemSize::Unknown {
-                    None
-                } else {
-                    Some(s.size.to_string())
-                }
-            })
-        },
-        |state, n:Option<String>| {
-            if let Some(i) = n {
-                state.as_mut().map(|mut s|
-                        s.size = ItemSize::from_str(&i).expect("Item size parse failure"));
+    let (desc, set_desc) = create_slice(
+        current_item,
+        |ci| ci.map(|c| c.description),
+        |ci, n| {
+            if let Ok(ci) = ci {
+                ci.description = n;
             }
         }
     );
-    let options = ItemSize::iter()
+
+    let (quantity, set_quantity) = create_slice(
+        current_item,
+        |ci| ci.map(|c| c.quantity),
+        |ci, n:String| {
+            let to_int = n.parse();
+            match (ci, to_int) {
+                (Ok(ci), Ok(qnt)) => ci.quantity = qnt,
+                (_, Err(e)) => set_submit_error(Some(RoadieAppError::ItemQntGtZero.to_string())),
+                _ => ()
+            };
+        }
+    );
+
+    let (size, set_size) = create_slice(
+        current_item,
+        |ci| ci.map(|c| c.size),
+        |ci, n:String| {
+            let to_size = ItemSize::from_str(&i);
+            match (ci, to_size) {
+                (Ok(ci), Ok(size)) => ci.size = size,
+                (_, Err(e)) => set_submit_error(Some(RoadieAppError::ItemSizeMustBeSet.to_string()))
+            }
+        }
+    );
+
+    let (infinite, set_infinite) = create_slice(
+        current_item,
+        |ci| ci.map(|c| c.infinite),
+        |ci, n:bool| {
+            if let Ok(ci) = ci {
+                ci.infinite = n;
+            }
+        }
+    );*/
+
+    let size_options = ItemSize::iter()
+        .filter(|v| v != &ItemSize::Unknown)
         .map(|variant| (variant.to_string(), variant.to_string()))
         .collect::<Vec<(String, String)>>();
 
-    let (infinite, set_infinite) = create_resource_slice(
-        state,
-        |state| state.as_ref().map(|s| s.infinite).unwrap_or_default(),
-        |state, n| {state.as_mut().map(|mut s| s.infinite = n);}
-    );
-
-
-
-
-    let submit_action = create_action(move |input: &BagItemForm| {
+    /*let submit_action = create_action(move |input: &BagItemForm| {
         let input = input.to_owned();
         async move {
             if input.id.is_some() {
@@ -157,14 +163,14 @@ pub fn ItemForm() -> impl IntoView {
             }
             ()
         }
-    });
+    });*/
 
     // TODO: Create spinner on action
     // TODO: Disable submit button on submit
     // TODO: Show spinner on initial load
 
     //Reset the form on successful submit
-    create_effect(move |_| {
+    /*create_effect(move |_| {
         submit_action.value().track();
         if submit_error.get_untracked().is_none() {
             state.set(BagItemForm::default());
@@ -197,6 +203,82 @@ pub fn ItemForm() -> impl IntoView {
         if submit_error.get().is_none() {
             submit_action.dispatch(state.get().unwrap());
         }
+    };*/
+    let result = create_memo(move |_| {
+        action.value().with(|f| {
+            f.clone().map(|g|
+                g.map(|r1|
+                    r1.unwrap_or_default()
+                ).unwrap_or_default()
+            ).unwrap_or_default()
+        })
+    });
+
+    let id = create_memo(move |_| result.with(|bif| bif.id.to_string()));
+
+    let name = create_memo(move |_| result.with(|bif| bif.name.clone()));
+    let name_error = Signal::derive(move || {
+        submit_error.with(|em|
+            em.get("name").cloned()
+        )
+    });
+
+    let desc = create_memo(move |_| result.with(|bif| bif.description.clone()));
+    let desc_error = Signal::derive(move || {
+        submit_error.with(|em|
+            em.get("description").cloned()
+        )
+    });
+
+    let quantity = create_memo(move |_| {
+        result.with(|bif| bif.quantity.to_string())
+    });
+    let quantity_error = Signal::derive(move || {
+        submit_error.with(|em|
+            em.get("quantity").cloned()
+        )
+    });
+
+    let size = create_memo(move |_| result.with(|bif| bif.size.to_string()));
+    let size_error = Signal::derive(move || {
+        submit_error.with(|em|
+            em.get("size").cloned()
+        )
+    });
+
+    let infinite = create_memo(move |_| result.with(|bif| bif.infinite));
+    let infinite_error = Signal::derive(move || {
+        submit_error.with(|em|
+            em.get("infinite").cloned()
+        )
+    });
+
+    let other_error = Signal::derive(move || {
+        submit_error.with(|em|
+            em.get("other").cloned()
+        )
+    });
+
+    let on_submit = move |ev:SubmitEvent| {
+        let data = CreateUpdateBagItem::from_event(&ev)
+            .map(|it| it.item.validate());
+        logging::log!("Data is {:?}", data);
+        ev.prevent_default();
+
+        match data {
+            Ok(Some(RoadieAppError::MultipleErrors(e))) => {
+                e.iter().for_each(|(key, value)| {
+                    set_submit_error.update(|em| {em.insert(key.clone(), value.clone());});
+                });
+            }
+            Err(e)  => {
+                set_submit_error.update(|em| {em.insert("other".to_string(), e.to_string());});
+            },
+            Ok(Some(e)) => {
+                set_submit_error.update(|em| {em.insert("other".to_string(), e.to_string());});
+            }
+            _ => ()
+        };
     };
 
     view! {
@@ -204,46 +286,53 @@ pub fn ItemForm() -> impl IntoView {
             <div class="card mx-auto w-full max-w-5xl  shadow-xl">
                 <div class="bg-base-100 rounded-xl">
                     <div class="py-24 px-10 w-full">
-                        <form on:submit=on_submit>
-                            <h2 class="text-2xl font-semibold mb-2 text-center">{move || format!("{} Item", submit_text())}</h2>
-                            <InputControlled
-                                input_type="text"
-                                field_name="name"
+                        <ActionForm action=action on:submit=on_submit >
+                            <h2 class="text-2xl font-semibold mb-2 text-center">{move || submit_text()}</h2>
+                            <InputText
+                                field_label="Id"
+                                container_style_base="invisible"
+                                input_type="hidden"
+                                field_name="item[id]"
+                                field_value=id />
+                            <InputText
                                 field_label="Name"
-                                container_style="mb-4"
-                                value=name
-                                set_value=set_name/>
-                            <TextareaControlled
-                                input_type="textarea"
-                                field_name="description"
+                                field_value=name
+                                placeholder = "Item Name"
+                                field_name="item[name]"
+                            />
+                            <Alert alert_type="Error".into() msg=name_error />
+
+                            <TextArea
                                 field_label="Item Description"
-                                container_style="mb-4"
-                                value=desc
-                                set_value=set_desc/>
-                            <InputControlled
+                                field_value=desc
+                                placeholder="Item Description"
+                                field_name="item[description]" />
+                            <Alert alert_type="Error".into() msg=desc_error />
+
+                            <InputText
                                 input_type="number"
-                                field_name="quantity"
                                 field_label="Quantity"
-                                container_style="mb-4"
-                                value=quantity
-                                set_value=set_quantity/>
-                            <SelectControlled
+                                field_value=quantity
+
+                                field_name="item[quantity]"
+                            />
+                            <Alert alert_type="Error".into() msg=quantity_error />
+
+                            <SelectBox
                                 field_label="Item Size"
-                                field_name="itemsize"
-                                container_style="mb-4"
-                                options=options
-                                selected=size
-                                set_selected=set_size />
-                            <CheckboxControlled
-                                field_name="infinite"
-                                field_label="Infinite"
-                                container_style="mb-4"
-                                input_style="toggle "
-                                value=infinite
-                                set_value=set_infinite />
-                            <Alert alert_type=AlertType::Error msg=submit_error />
+                                field_value=size
+                                field_name="item[size]"
+                                options=size_options />
+                            <Alert alert_type="Error".into() msg=size_error />
+
+                            <Checkbox
+                                field_label="Is the supply infinite?"
+                                field_value=infinite
+                                field_name="item[infinite]" />
+                            <Alert alert_type="Error".into() msg=infinite_error />
                             <button type="submit" class="btn mt-2 w-full btn-primary">{move || submit_text()}</button>
-                        </form>
+                            <Alert alert_type="Error".into() msg=other_error />
+                        </ActionForm>
                     </div>
                 </div>
             </div>

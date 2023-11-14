@@ -13,7 +13,7 @@ pub enum ItemSize {
     Small,
     Medium,
     Large,
-    #[strum(disabled)]
+    //#[strum(disabled)]
     Unknown
 }
 
@@ -208,17 +208,17 @@ cfg_if! {
             async fn get_many(mut query: SelectStatement, pool: &SqlitePool) -> Result<Vec<Self>, sqlx::Error> {
                 let (q, values) = query
                     .from(BagItemsTable::Table)
-                    .column(Asterisk)
+                    .column((BagItemsTable::Table, Asterisk))
                     .expr_as(Expr::col((UserTable::Table, UserTable::Id)), Alias::new("user_id"))
                     .column((UserTable::Table, UserTable::Username))
                     .inner_join(
                         UserTable::Table,
                         Expr::col((BagItemsTable::Table, BagItemsTable::AddedBy)).equals((UserTable::Table, UserTable::Id))
                     )
+
                     .order_by((BagItemsTable::Table, BagItemsTable::Id), Order::Desc)
                     .to_owned()
                     .build_sqlx(SqliteQueryBuilder);
-
                 let result = sqlx::query_with(&q, values)
                     .fetch_all(pool)
                     .await?;

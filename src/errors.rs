@@ -1,6 +1,7 @@
 use http::status::StatusCode;
 use thiserror::Error;
 use serde::{Serialize, Deserialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Error, Serialize, Deserialize, PartialEq)]
 pub enum RoadieAppError {
@@ -17,7 +18,15 @@ pub enum RoadieAppError {
     #[error("Validation failed")]
     ValidationFailedError,
     #[error("Validation failed for field {0}")]
-    ValidationFailedForField(String)
+    ValidationFailedForField(String),
+    #[error("Item name can't be empty")]
+    ItemNameNonEmpty,
+    #[error("Item size must be set")]
+    ItemSizeMustBeSet,
+    #[error("Item quantity must be > 0")]
+    ItemQntGtZero,
+    #[error("Multiple errors")]
+    MultipleErrors(HashMap<String, String>)
 }
 
 pub type RoadieResult<T> = Result<T, RoadieAppError>;
@@ -31,8 +40,12 @@ impl RoadieAppError {
             RoadieAppError::InternalServerError => {
                 StatusCode::INTERNAL_SERVER_ERROR
             },
-            RoadieAppError::ValidationFailedError => StatusCode::EXPECTATION_FAILED,
-            RoadieAppError::ValidationFailedForField(_) => StatusCode::EXPECTATION_FAILED
+            RoadieAppError::ValidationFailedError |
+            RoadieAppError::ItemQntGtZero  |
+            RoadieAppError::ItemSizeMustBeSet |
+            RoadieAppError::ItemNameNonEmpty => StatusCode::EXPECTATION_FAILED,
+            RoadieAppError::ValidationFailedForField(_) => StatusCode::EXPECTATION_FAILED,
+            RoadieAppError::MultipleErrors(_) => StatusCode::EXPECTATION_FAILED,
         }
     }
 }
