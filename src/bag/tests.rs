@@ -1,7 +1,5 @@
 use cfg_if::cfg_if;
 
-
-
 cfg_if! {
     if #[cfg(feature = "ssr")] {
         #[cfg(test)]
@@ -12,13 +10,9 @@ cfg_if! {
             use crate::bag::api::*;
 
             use sqlx::SqlitePool;
-            use sqlx::Row;
             use anyhow::Result;
-            use axum_test::TestServer;
             use chrono::prelude::*;
             use leptos::logging;
-            use leptos::prelude::*;
-            use futures::StreamExt;
             use crate::bag::model::*;
             use tracing::span;
             use http::status::StatusCode;
@@ -180,7 +174,6 @@ cfg_if! {
             }
 
             use serde_qs as qs;
-            use crate::bag::api::create_bag_item;
 
             #[tracing::instrument(level = "info", skip(pool), fields(error), err)]
             #[sqlx::test]
@@ -188,43 +181,47 @@ cfg_if! {
                 let test_server = get_test_server(&pool).await?;
 
                 let span = span!(tracing::Level::INFO, "test_bagitem_api").entered();
-                let bi = CreateBagItem {
-                    item: NewBagItem {
+                let bi = CreateUpdateBagItem {
+                    item: BagItemForm {
+                        id: -1,
                         description: "Some description".into(),
                         name: "Some item".into(),
-                        infinite: false,
+                        infinite: Some(false),
                         quantity: 1,
-                        size: ItemSize::Large
+                        size: Some(ItemSize::Large)
                     }
                 };
 
-                let response = test_server.post("/api/create_bag_item")
+                let response = test_server.post("/api/create_update_bag_item")
                     .text(qs::to_string(&bi)?)
                     .content_type("application/x-www-form-urlencoded")
                     .await;
-                let res = response.json::<RoadieResult<BagItem>>();
+                response.assert_status(StatusCode::UNAUTHORIZED);
+                let res = response.json::<RoadieResult<BagItemForm>>();
                 assert_eq!(res, Err(RoadieAppError::Unauthorized));
 
-                let test_user = create_test_user(&test_server, None).await;
+                let _test_user = create_test_user(&test_server, None).await;
 
-                let response = test_server.post("/api/create_bag_item")
+                let response = test_server.post("/api/create_update_bag_item")
                     .text(qs::to_string(&bi)?)
                     .content_type("application/x-www-form-urlencoded")
                     .await;
-                let res = response.json::<RoadieResult<BagItem>>();
+                response.assert_status(StatusCode::SEE_OTHER);
+                let res = response.json::<RoadieResult<BagItemForm>>();
                 let mut bag_item = res.unwrap();
 
                 assert_ne!(bag_item.id, -1);
                 bag_item.name = "Some other item".into();
-                let bi = UpdateBagItem {
+                let bi = CreateUpdateBagItem {
                     item: bag_item.clone()
                 };
 
-                let response = test_server.post("/api/update_bag_item")
+                let response = test_server.post("/api/create_update_bag_item")
                     .text(qs::to_string(&bi)?)
                     .content_type("application/x-www-form-urlencoded")
                     .await;
-                let res = response.json::<RoadieResult<()>>();
+                response.assert_status(StatusCode::SEE_OTHER);
+                let res = response.json::<RoadieResult<BagItemForm>>();
                 assert_eq!(res.is_ok(), true);
 
                 let gbi = GetBagItem {
@@ -251,7 +248,7 @@ cfg_if! {
                 assert_eq!(response.status_code(), StatusCode::NOT_FOUND);
 
                 let di = DeleteBagItem {
-                    item_id: bag_item.id
+                    id: bag_item.id
                 };
                 let response = test_server.post("/api/delete_bag_item")
                     .text(qs::to_string(&di)?)

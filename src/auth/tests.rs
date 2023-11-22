@@ -5,8 +5,7 @@ cfg_if! { if #[cfg(feature = "ssr")] {
 #[cfg(test)]
 pub(crate) mod tests {
 
-    use axum::Router;
-    use axum_test::{TestServer, TestServerConfig};
+    use axum_test::TestServer;
     use sqlx::SqlitePool;
     use crate::auth::model::{User, UserTable, SQLUser};
     use crate::errors::*;
@@ -17,7 +16,7 @@ pub(crate) mod tests {
     };
     use sqlx::prelude::*;
     use sea_query_binder::SqlxBinder;
-    use leptos::{logging, ServerFnError};
+    use leptos::logging;
     use serde::{Serialize, Deserialize};
     use http::StatusCode;
     use anyhow::*;
@@ -80,6 +79,7 @@ pub(crate) mod tests {
         logging::log!("Creating test user {}", uname);
         let response = server.post("/api/auth_logout")
             .await;
+        response.assert_status(StatusCode::FOUND);
         let response = server.post("/api/auth_signup")
             .form(&SignupTest {
                 username: uname.clone(),
@@ -87,6 +87,7 @@ pub(crate) mod tests {
                 password_confirmation: "1234".into()
             })
             .await;
+        response.assert_status(StatusCode::SEE_OTHER);
         let response2 = server.post("/api/auth_login")
             .form(&LoginTest {
                 username: uname.clone(),
@@ -94,7 +95,7 @@ pub(crate) mod tests {
                 remember: Some("yes".into())
             })
             .await;
-
+        response2.assert_status(StatusCode::SEE_OTHER);
         let user_response = server.get("/api/get_user").await;
         let u = user_response.json::<User>();
         assert_eq!(u.username, uname);

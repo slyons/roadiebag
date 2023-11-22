@@ -1,52 +1,50 @@
-use leptos::*;
-use leptos::ev::SubmitEvent;
-use leptos_router::*;
 use crate::common::components::input::*;
-use crate::common::components::{AlertType, Alert};
-use crate::common::create_resource_slice;
-use std::str::FromStr;
+use crate::common::components::Alert;
+use leptos::ev::SubmitEvent;
+use leptos::*;
+use leptos_router::*;
 use std::collections::HashMap;
 use strum::*;
 
 use crate::bag::api::*;
 use crate::bag::model::*;
-use crate::errors::{RoadieAppError, RoadieResult};
-use crate::error_template::ErrorTemplate;
+use crate::errors::RoadieAppError;
 
 #[derive(Params, Default, PartialOrd, PartialEq, Debug, Copy, Clone)]
 pub struct AddEditParams {
-    id: Option<i64>
+    id: Option<i64>,
 }
 
 #[component]
 pub fn AddEditItem() -> impl IntoView {
-    view! {
-        <ItemForm editable=true/>
-    }
+    view! { <ItemForm _editable=true/> }
 }
 
 #[component]
-pub fn ItemForm(editable: bool) -> impl IntoView {
+pub fn ItemForm(_editable: bool) -> impl IntoView {
     let params = use_params::<AddEditParams>();
-    let (submit_error, set_submit_error) =
-        create_signal(HashMap::new());
+    let (submit_error, set_submit_error) = create_signal(HashMap::new());
     let action = create_server_action::<CreateUpdateBagItem>();
 
-    let item_loader = create_resource(
+    create_resource(
         move || params.get(),
-        move |p| async move{
+        move |p| async move {
             if let Ok(p) = p {
                 if let Some(id) = p.id {
                     match get_bag_item(id).await {
                         Ok(Err(RoadieAppError::MultipleErrors(e))) => set_submit_error(e),
                         Err(e) => {
-                            set_submit_error.update(|m| {m.insert("other".to_string(), e.to_string());});
-                        },
+                            set_submit_error.update(|m| {
+                                m.insert("other".to_string(), e.to_string());
+                            });
+                        }
                         Ok(Err(e)) => {
-                            set_submit_error.update(|m| {m.insert("other".to_string(), e.to_string());});
-                        },
+                            set_submit_error.update(|m| {
+                                m.insert("other".to_string(), e.to_string());
+                            });
+                        }
                         Ok(Ok(bif)) => {
-                            let bif:BagItemForm = bif.into();
+                            let bif: BagItemForm = bif.into();
                             logging::log!("Loaded item {:?}", bif);
                             action.value().set(Some(Ok(Ok(bif))));
                         }
@@ -54,13 +52,12 @@ pub fn ItemForm(editable: bool) -> impl IntoView {
                 } else {
                     logging::log!("Loading default item");
                     action.value().try_set(Some(Ok(Ok(BagItemForm::default()))));
-
                 }
             } else {
                 logging::error!("Unable to parse params");
                 use_navigate()("/items", Default::default());
             }
-        }
+        },
     );
 
     let submit_text = move || {
@@ -206,78 +203,62 @@ pub fn ItemForm(editable: bool) -> impl IntoView {
     };*/
     let result = create_memo(move |_| {
         action.value().with(|f| {
-            f.clone().map(|g|
-                g.map(|r1|
-                    r1.unwrap_or_default()
-                ).unwrap_or_default()
-            ).unwrap_or_default()
+            f.clone()
+                .map(|g| g.map(|r1| r1.unwrap_or_default()).unwrap_or_default())
+                .unwrap_or_default()
         })
     });
 
     let id = create_memo(move |_| result.with(|bif| bif.id.to_string()));
 
     let name = create_memo(move |_| result.with(|bif| bif.name.clone()));
-    let name_error = Signal::derive(move || {
-        submit_error.with(|em|
-            em.get("name").cloned()
-        )
-    });
+    let name_error = Signal::derive(move || submit_error.with(|em| em.get("name").cloned()));
 
     let desc = create_memo(move |_| result.with(|bif| bif.description.clone()));
-    let desc_error = Signal::derive(move || {
-        submit_error.with(|em|
-            em.get("description").cloned()
-        )
-    });
+    let desc_error = Signal::derive(move || submit_error.with(|em| em.get("description").cloned()));
 
-    let quantity = create_memo(move |_| {
-        result.with(|bif| bif.quantity.to_string())
-    });
-    let quantity_error = Signal::derive(move || {
-        submit_error.with(|em|
-            em.get("quantity").cloned()
-        )
-    });
+    let quantity = create_memo(move |_| result.with(|bif| bif.quantity.to_string()));
+    let quantity_error =
+        Signal::derive(move || submit_error.with(|em| em.get("quantity").cloned()));
 
-    let size = create_memo(move |_| result.with(|bif| bif.size.to_string()));
-    let size_error = Signal::derive(move || {
-        submit_error.with(|em|
-            em.get("size").cloned()
-        )
-    });
+    let size = create_memo(move |_| result.with(|bif| bif.size.unwrap_or_default().to_string()));
+    let size_error = Signal::derive(move || submit_error.with(|em| em.get("size").cloned()));
 
-    let infinite = create_memo(move |_| result.with(|bif| bif.infinite));
-    let infinite_error = Signal::derive(move || {
-        submit_error.with(|em|
-            em.get("infinite").cloned()
-        )
-    });
+    let infinite = create_memo(move |_| result.with(|bif| bif.infinite.unwrap_or(false)));
+    let infinite_error =
+        Signal::derive(move || submit_error.with(|em| em.get("infinite").cloned()));
 
-    let other_error = Signal::derive(move || {
-        submit_error.with(|em|
-            em.get("other").cloned()
-        )
-    });
+    let other_error = Signal::derive(move || submit_error.with(|em| em.get("other").cloned()));
 
-    let on_submit = move |ev:SubmitEvent| {
-        let data = CreateUpdateBagItem::from_event(&ev)
-            .map(|it| it.item.validate());
+    let on_submit = move |ev: SubmitEvent| {
+        logging::log!("Submit event is {:?}", ev);
+        let data = CreateUpdateBagItem::from_event(&ev).map(|it| it.item.validate());
         logging::log!("Data is {:?}", data);
-        ev.prevent_default();
+
+        set_submit_error(HashMap::new());
 
         match data {
             Ok(Some(RoadieAppError::MultipleErrors(e))) => {
                 e.iter().for_each(|(key, value)| {
-                    set_submit_error.update(|em| {em.insert(key.clone(), value.clone());});
+                    set_submit_error.update(|em| {
+                        em.insert(key.clone(), value.clone());
+                    });
                 });
+                ev.prevent_default();
             }
-            Err(e)  => {
-                set_submit_error.update(|em| {em.insert("other".to_string(), e.to_string());});
-            },
+            Err(e) => {
+                set_submit_error.update(|em| {
+                    em.insert("other".to_string(), e.to_string());
+                });
+                ev.prevent_default();
+            }
             Ok(Some(e)) => {
-                set_submit_error.update(|em| {em.insert("other".to_string(), e.to_string());});
+                set_submit_error.update(|em| {
+                    em.insert("other".to_string(), e.to_string());
+                });
+                ev.prevent_default();
             }
-            _ => ()
+            _ => (),
         };
     };
 
@@ -286,28 +267,30 @@ pub fn ItemForm(editable: bool) -> impl IntoView {
             <div class="card mx-auto w-full max-w-5xl  shadow-xl">
                 <div class="bg-base-100 rounded-xl">
                     <div class="py-24 px-10 w-full">
-                        <ActionForm action=action on:submit=on_submit >
-                            <h2 class="text-2xl font-semibold mb-2 text-center">{move || submit_text()}</h2>
+                        <ActionForm action=action on:submit=on_submit>
+                            <h2 class="text-2xl font-semibold mb-2 text-center">{submit_text}</h2>
                             <InputText
                                 field_label="Id"
                                 container_style_base="invisible"
                                 input_type="hidden"
                                 field_name="item[id]"
-                                field_value=id />
+                                field_value=id
+                            />
                             <InputText
                                 field_label="Name"
                                 field_value=name
-                                placeholder = "Item Name"
+                                placeholder="Item Name"
                                 field_name="item[name]"
                             />
-                            <Alert alert_type="Error".into() msg=name_error />
+                            <Alert alert_type="Error".into() msg=name_error/>
 
                             <TextArea
                                 field_label="Item Description"
                                 field_value=desc
                                 placeholder="Item Description"
-                                field_name="item[description]" />
-                            <Alert alert_type="Error".into() msg=desc_error />
+                                field_name="item[description]"
+                            />
+                            <Alert alert_type="Error".into() msg=desc_error/>
 
                             <InputText
                                 input_type="number"
@@ -316,22 +299,26 @@ pub fn ItemForm(editable: bool) -> impl IntoView {
 
                                 field_name="item[quantity]"
                             />
-                            <Alert alert_type="Error".into() msg=quantity_error />
+                            <Alert alert_type="Error".into() msg=quantity_error/>
 
                             <SelectBox
                                 field_label="Item Size"
                                 field_value=size
                                 field_name="item[size]"
-                                options=size_options />
-                            <Alert alert_type="Error".into() msg=size_error />
+                                options=size_options
+                            />
+                            <Alert alert_type="Error".into() msg=size_error/>
 
                             <Checkbox
                                 field_label="Is the supply infinite?"
                                 field_value=infinite
-                                field_name="item[infinite]" />
-                            <Alert alert_type="Error".into() msg=infinite_error />
-                            <button type="submit" class="btn mt-2 w-full btn-primary">{move || submit_text()}</button>
-                            <Alert alert_type="Error".into() msg=other_error />
+                                field_name="item[infinite]"
+                            />
+                            <Alert alert_type="Error".into() msg=infinite_error/>
+                            <button type="submit" class="btn mt-2 w-full btn-primary">
+                                {submit_text}
+                            </button>
+                            <Alert alert_type="Error".into() msg=other_error/>
                         </ActionForm>
                     </div>
                 </div>

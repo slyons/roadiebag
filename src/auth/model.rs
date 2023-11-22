@@ -18,7 +18,7 @@ cfg_if! {
 pub struct User {
     pub id: i64,
     pub username: String,
-    pub anonymous: bool
+    pub anonymous: bool,
 }
 
 impl Default for User {
@@ -26,7 +26,7 @@ impl Default for User {
         Self {
             id: -1,
             username: "Anonymous".into(),
-            anonymous: true
+            anonymous: true,
         }
     }
 }

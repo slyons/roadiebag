@@ -1,8 +1,5 @@
 use cfg_if::cfg_if;
 
-
-
-
 /*use sqlx::Row;
 pub trait FromRowPrefix<'r, R>: Sized
     where

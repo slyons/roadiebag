@@ -1,20 +1,30 @@
-use serde::{Deserialize, Serialize};
 use cfg_if::cfg_if;
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use strum::*;
-
-
 
 use crate::auth::User;
 use strum::Display;
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Clone, Debug, Copy, EnumIter, Display, EnumString, FromRepr)]
+#[derive(
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Clone,
+    Debug,
+    Copy,
+    EnumIter,
+    Display,
+    EnumString,
+    FromRepr,
+)]
 pub enum ItemSize {
     Small,
     Medium,
     Large,
     //#[strum(disabled)]
-    Unknown
+    Unknown,
 }
 
 impl Default for ItemSize {
@@ -29,18 +39,18 @@ impl From<u8> for ItemSize {
             0 => ItemSize::Small,
             1 => ItemSize::Medium,
             2 => ItemSize::Large,
-            _ => ItemSize::Unknown
+            _ => ItemSize::Unknown,
         }
     }
 }
 
-impl Into<u8> for ItemSize {
-    fn into(self) -> u8 {
-        match self {
+impl From<ItemSize> for u8 {
+    fn from(value: ItemSize) -> u8 {
+        match value {
             ItemSize::Small => 0,
             ItemSize::Medium => 1,
             ItemSize::Large => 2,
-            ItemSize::Unknown => 99
+            ItemSize::Unknown => 99,
         }
     }
 }
@@ -54,7 +64,7 @@ pub struct BagItem {
     pub(crate) quantity: i32,
     pub(crate) size: ItemSize,
     pub(crate) infinite: bool,
-    pub(crate) created_at: DateTime<Utc>
+    pub(crate) created_at: DateTime<Utc>,
 }
 
 #[derive(Serialize, Default, Deserialize, PartialEq, Eq, Clone, Debug)]
@@ -65,20 +75,19 @@ pub struct BagItemFilter {
     pub size: Option<Vec<u8>>,
     pub infinite: Option<bool>,
     pub page_size: Option<u64>,
-    pub page_num: Option<u64>
+    pub page_num: Option<u64>,
 }
 
 impl BagItemFilter {
     pub fn with_page(&self, page_num: u64) -> Self {
         BagItemFilter {
-
             page_num: Some(page_num),
             added_by: self.added_by.clone(),
             name: self.name.clone(),
             description: self.description.clone(),
             size: self.size.clone(),
-            infinite: self.infinite.clone(),
-            page_size: self.page_size.clone()
+            infinite: self.infinite,
+            page_size: self.page_size,
         }
     }
 }
@@ -89,7 +98,7 @@ pub struct BagItemPage {
     pub page_num: u64,
     pub total_pages: u64,
     pub page_size: u64,
-    pub total_results: u64
+    pub total_results: u64,
 }
 
 cfg_if! {
@@ -315,7 +324,7 @@ pub struct TakenBagItem {
     pub item: BagItem,
     pub extraction_time: DateTime<Utc>,
     pub rounds: u32,
-    pub done: bool
+    pub done: bool,
 }
 
 cfg_if! {

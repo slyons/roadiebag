@@ -1,0 +1,15 @@
+repos:
+- hooks:
+  - id: commitizen
+  - id: commitizen-branch
+    stages:
+    - push
+  repo: https://github.com/commitizen-tools/commitizen
+  rev: 3.12.0
+- repo: https://github.com/slyons/pre-commit-leptos
+  rev: ead45a6290e4d8534ea3ec5f1514f86f578fdff4
+  hooks:
+    - id: cargo-check
+    - id: clippy
+    - id: leptos-test
+    - id: leptosfmt
