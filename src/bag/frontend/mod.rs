@@ -14,15 +14,8 @@ pub fn BagRoutesOutlet() -> impl IntoView {
 #[component(transparent)]
 pub fn BagRoutes() -> impl IntoView {
 
-    let is_authed = Signal::derive(|| {
-        let ac = use_context::<AuthContext>().expect("Failed to get AuthContext");
-        if let Some(ur) = ac.user.get() {
-            !ur.unwrap_or_default().anonymous
-        } else {
-            false
-        }
-    });
-
+    let ac = use_context::<AuthContext>().expect("Failed to get AuthContext");
+    let is_authed = ac.auth_signal();
     view! {
         <ProtectedRoute path="/" view=BagRoutesOutlet condition=is_authed redirect_path="/auth">
             <ProtectedRoute

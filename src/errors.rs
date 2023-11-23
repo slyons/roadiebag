@@ -29,7 +29,9 @@ pub enum RoadieAppError {
     #[error("Multiple errors")]
     MultipleErrors(HashMap<String, String>),
     #[error("Server error {0}")]
-    ServerError(ServerFnError)
+    ServerError(ServerFnError),
+    #[error("Signups are not enabled")]
+    SignupsNotEnabled,
 }
 
 pub type RoadieResult<T> = Result<T, RoadieAppError>;
@@ -49,42 +51,31 @@ impl RoadieAppError {
             | RoadieAppError::ItemNameNonEmpty => StatusCode::EXPECTATION_FAILED,
             RoadieAppError::ValidationFailedForField(_) => StatusCode::EXPECTATION_FAILED,
             RoadieAppError::MultipleErrors(_) => StatusCode::EXPECTATION_FAILED,
+            RoadieAppError::SignupsNotEnabled => StatusCode::BAD_REQUEST
         }
     }
 }
 
-/*#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum NestedResult<T, E> {
-    Ok(T),
-    Err(E)
-}*/
-
-pub struct NestedResult();
-
-impl NestedResult {
-    // TODO: Just make this a function, no need for the struct
-    pub fn from<T>(res: Result<RoadieResult<T>, ServerFnError>) -> RoadieResult<T> {
-        match res {
-            Err(e) => Err(RoadieAppError::ServerError(e)),
-            Ok(Err(e)) => Err(e),
-            Ok(Ok(v)) => Ok(v)
-        }
-    }
+pub trait IntoRoadie<T> {
+    fn into_rr(self) -> RoadieResult<T>;
 }
 
-/*impl<T> NestedResult<T, RoadieAppError> {
-    pub fn from<T>(res: Result<RoadieResult<T>, ServerFnError>) -> NestedResult<T, RoadieAppError> {
-
-    }
-
-    pub fn is_ok(&self) -> bool {
+impl<T> IntoRoadie<T> for Result<RoadieResult<T>, ServerFnError> {
+    fn into_rr(self) -> RoadieResult<T> {
         match self {
-            NestedResult::Err(_) => false,
-            NestedResult::Ok(_) => true
+            Ok(o) => o,
+            Err(e) => Err(RoadieAppError::ServerError(e))
         }
     }
+}
 
-    pub fn is_err(&self) -> bool {
-        !self.is_ok()
+pub trait IntoRoadieOption<T> {
+    fn into_rr(self) -> Option<RoadieResult<T>>;
+}
+
+
+impl<T> IntoRoadieOption<T> for Option<Result<RoadieResult<T>, ServerFnError>> {
+    fn into_rr(self) -> Option<RoadieResult<T>> {
+        self.map(|u| u.into_rr())
     }
-}*/
+}

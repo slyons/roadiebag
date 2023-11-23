@@ -4,19 +4,49 @@ use crate::auth::api::*;
 use crate::auth::model;
 use crate::common::components::input::*;
 use crate::common::components::Alert;
-use crate::errors::RoadieResult;
+use crate::errors::*;
 use leptos_router::*;
 use model::User;
 
 #[derive(Clone)]
 pub struct AuthContext {
-    pub login: Action<LoginAPI, Result<RoadieResult<User>, ServerFnError>>,
+    /*pub login: Action<LoginAPI, Result<RoadieResult<User>, ServerFnError>>,
     pub logout: Action<LogoutAPI, Result<(), ServerFnError>>,
-    pub signup: Action<SignupAPI, Result<RoadieResult<()>, ServerFnError>>,
-    pub user: Resource<(usize, usize, usize, ()), Result<User, ServerFnError>>,
+    pub signup: Action<SignupAPI, Result<RoadieResult<()>, ServerFnError>>,*/
+    pub user: Resource<((), (), (), ()), Result<User, ServerFnError>>,
 }
 
+#[allow(clippy::new_without_default)]
 impl AuthContext {
+    pub fn new() -> AuthContext {
+        let location = use_location();
+
+        let user = create_resource(
+            move || {
+                (
+                    location.pathname.track(),
+                    location.query.track(),
+                    location.search.track(),
+                    location.state.track()
+                )
+            },
+            |_| async move { get_user().await },
+        );
+        //user.refetch();
+        AuthContext {
+            user,
+        }
+    }
+
+    pub fn auth_signal(&self) -> Signal<bool> {
+        let user = self.user;
+        Signal::derive(move || {
+            user.get()
+                .map(|u| u.map(|u2| !u2.anonymous).unwrap_or(false))
+                .unwrap_or(false)
+        })
+    }
+
     pub fn is_anonymous(&self) -> bool {
         match (self.user)() {
             Some(Ok(u)) => u.anonymous,
@@ -40,47 +70,27 @@ impl AuthContext {
 }
 
 pub fn provide_auth() {
-    let location = use_location();
-    let login = create_server_action::<LoginAPI>();
-    let logout = create_server_action::<LogoutAPI>();
-    let signup = create_server_action::<SignupAPI>();
-    let user = create_resource(
-        move || {
-            (
-                login.version().get(),
-                logout.version().get(),
-                signup.version().get(),
-                location.state.track(),
-            )
-        },
-        |_| async move { get_user().await },
-    );
-    provide_context(AuthContext {
-        user,
-        signup,
-        logout,
-        login,
-    });
+    provide_context(AuthContext::new());
 }
 
 #[component]
 pub fn CSignup() -> impl IntoView {
-    let auth_context = use_context::<AuthContext>().expect("Failed to get AuthContext");
-    let (signup_error, set_signup_error) = create_signal(None);
 
-    create_effect(move |_| match auth_context.signup.value().get() {
+    let (signup_error, set_signup_error) = create_signal(None);
+    let signup = create_server_action::<SignupAPI>();
+    create_effect(move |_| match signup.value().get() {
         Some(Ok(Err(e))) => set_signup_error(Some(e.to_string())),
         _ => set_signup_error(None),
     });
 
     create_effect(move |_| {
-        if let Some(Ok(Ok(_))) = auth_context.signup.value().get() {
+        if let Some(Ok(Ok(_))) = signup.value().get() {
             use_navigate()("/auth", Default::default())
         }
     });
     view! {
         <h2 class="text-2xl font-semibold mb-2 text-center">"Register"</h2>
-        <ActionForm action=auth_context.signup>
+        <ActionForm action=signup>
 
             <div class="mb-4">
                 <InputText
@@ -120,23 +130,26 @@ pub fn CSignup() -> impl IntoView {
 
 #[component]
 pub fn CLogin() -> impl IntoView {
-    let auth_context = use_context::<AuthContext>().expect("Failed to get AuthContext");
     let (auth_error, set_auth_error) = create_signal(None);
-
-    create_effect(move |_| match auth_context.login.value().get() {
-        Some(Ok(Err(e))) => set_auth_error(Some(e.to_string())),
-        _ => set_auth_error(None),
-    });
-
+    let login = create_server_action::<LoginAPI>();
     create_effect(move |_| {
-        if let Some(Ok(Ok(_))) = auth_context.login.value().get() {
-            use_navigate()("/", Default::default());
+        let val = login.value().get().into_rr();
+        tracing::info!("CLogin value is {:?}", val);
+        match val {
+            Some(Err(e)) => set_auth_error(Some(e.to_string())),
+            Some(Ok(_)) => {
+                set_auth_error(None);
+                tracing::info!("Login successful");
+                leptos::logging::log!("Login successful");
+                use_navigate()("/", Default::default());
+            },
+            None => set_auth_error(None)
         }
     });
 
     view! {
         <h2 class="text-2xl font-semibold mb-2 text-center">"Login"</h2>
-        <ActionForm action=auth_context.login>
+        <ActionForm action=login>
             <div class="mb-4">
                 <InputText
                     field_name="username"
@@ -175,7 +188,6 @@ pub fn CLogin() -> impl IntoView {
 
 #[component]
 pub fn AuthWrapper() -> impl IntoView {
-    logging::log!("AuthWrapper");
     view! {
         <div class="min-h-screen bg-base-200 flex items-center">
             <div class="card mx-auto w-full max-w-5xl  shadow-xl">

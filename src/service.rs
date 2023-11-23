@@ -108,6 +108,7 @@ cfg_if! {
 
         pub fn get_app_state(pool: SqlitePool, options: LeptosOptions) -> AppState {
             let routes = generate_route_list(App);
+
             AppState {
                 leptos_options: options,
                 pool: pool.clone(),

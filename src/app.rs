@@ -7,13 +7,12 @@ use crate::errors::RoadieAppError;
 use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
-use std::panic;
 
 #[component]
 pub fn App() -> impl IntoView {
     // Provides context that manages stylesheets, titles, meta tags, etc.
     provide_meta_context();
-    panic::set_hook(Box::new(console_error_panic_hook::hook));
+    //
 
     view! {
         <Html attr:data-theme="cupcake"/>
@@ -39,9 +38,11 @@ pub fn App() -> impl IntoView {
                     provide_auth();
                 }
                 <Routes>
-                    <Route path="/" view=RoadieBagPage>
+                    <Route path="/" view=RoadieBagPage ssr=SsrMode::OutOfOrder>
+                        // <Transition fallback=|| view!{}>
                         <Auth/>
                         <BagRoutes/>
+                    // </Transition>
                     </Route>
                 </Routes>
             </Router>
@@ -54,9 +55,14 @@ pub fn App() -> impl IntoView {
 /// Renders the home page of your application.
 #[component(transparent)]
 fn RoadieBagPage() -> impl IntoView {
+
+    //let auth_context = use_context::<AuthContext>().expect("Failed to get AuthContext");
+    //auth_context.user.refetch();
     view! {
         <Layout>
+            // <Transition fallback=|| view!{}>
             <Outlet/>
+        // </Transition>
         </Layout>
     }
 }

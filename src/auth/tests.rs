@@ -87,7 +87,7 @@ pub(crate) mod tests {
                 password_confirmation: "1234".into()
             })
             .await;
-        response.assert_status(StatusCode::SEE_OTHER);
+        response.assert_status(StatusCode::FOUND);
         let response2 = server.post("/api/auth_login")
             .form(&LoginTest {
                 username: uname.clone(),
@@ -95,7 +95,7 @@ pub(crate) mod tests {
                 remember: Some("yes".into())
             })
             .await;
-        response2.assert_status(StatusCode::SEE_OTHER);
+        response2.assert_status(StatusCode::FOUND);
         let user_response = server.get("/api/get_user").await;
         let u = user_response.json::<User>();
         assert_eq!(u.username, uname);
@@ -120,7 +120,7 @@ pub(crate) mod tests {
                 password_confirmation: "1234".into()
             })
             .await;
-        response.assert_status(StatusCode::SEE_OTHER);
+        response.assert_status(StatusCode::FOUND);
 
 
         let response2 = test_server.post("/api/auth_login")
@@ -130,7 +130,7 @@ pub(crate) mod tests {
                 remember: Some("yes".into())
             })
             .await;
-        response2.assert_status(StatusCode::SEE_OTHER);
+        response2.assert_status(StatusCode::FOUND);
 
         let user_response = test_server.get("/api/get_user").await;
         let user = user_response.json::<User>();

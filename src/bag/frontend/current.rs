@@ -2,7 +2,7 @@ use crate::bag::api::*;
 use crate::bag::model::TakenBagItem;
 
 use leptos::*;
-use crate::errors::{RoadieResult, NestedResult};
+use crate::errors::*;
 
 #[component]
 pub fn CurrentItem() -> impl IntoView {
@@ -10,7 +10,7 @@ pub fn CurrentItem() -> impl IntoView {
     let taken_item = create_resource(
         || (),
         move |_| async move {
-            let to_set = NestedResult::from(last_taken().await);
+            let to_set = last_taken().await.into_rr();
 
             /*let to_set = match last_taken().await {
                 Err(e) => Err(RoadieAppError::ServerError(e)),
@@ -30,7 +30,7 @@ pub fn CurrentItem() -> impl IntoView {
     let done_with_item = create_action(move |()| async move {
         if let Ok(Some(mut current_item)) = tbi() {
             current_item.done = true;
-            let to_set = NestedResult::from(update_taken(current_item).await);
+            let to_set = update_taken(current_item).await.into_rr();
             let to_set = to_set.map(|_v| None);
             set_tbi(to_set);
         }

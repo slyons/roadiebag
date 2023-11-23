@@ -46,14 +46,24 @@ pub async fn signup(
     let pool = db_pool()?;
     let response = expect_context::<ResponseOptions>();
 
-    if username.trim().len() == 0 {
+    let allow_signups:bool  = std::env::var("ROADIE_ENABLE_SIGNUPS")
+        .unwrap_or_default()
+        .parse()
+        .unwrap_or(true);
+
+    if !allow_signups {
+        response.set_status(StatusCode::BAD_REQUEST);
+        return Ok(Err(RoadieAppError::SignupsNotEnabled));
+    }
+
+    if username.trim().is_empty() {
         response.set_status(StatusCode::BAD_REQUEST);
         return Ok(Err(RoadieAppError::ValidationFailedForField(
             "username".into(),
         )));
     }
 
-    if password.trim().len() == 0 {
+    if password.trim().is_empty() {
         response.set_status(StatusCode::BAD_REQUEST);
         return Ok(Err(RoadieAppError::ValidationFailedForField(
             "password".into(),
@@ -76,6 +86,7 @@ pub async fn signup(
     }
 
     SQLUser::create(username, password, &pool).await?;
+    leptos_axum::redirect("/auth");
     Ok(Ok(()))
 }
 
@@ -101,6 +112,7 @@ pub async fn login(
             Ok(true) => {
                 auth.login_user(u.id.clone());
                 auth.remember_user(remember.is_some());
+                leptos_axum::redirect("/");
                 Ok(Ok(u.into()))
             }
             Ok(false) => {
@@ -126,7 +138,7 @@ pub async fn logout() -> Result<(), ServerFnError> {
     let auth = auth_session()?;
 
     auth.logout_user();
-    leptos_axum::redirect("/");
+    leptos_axum::redirect("/auth");
 
     Ok(())
 }

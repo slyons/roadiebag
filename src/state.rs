@@ -12,7 +12,7 @@ cfg_if! {
         pub struct AppState{
             pub leptos_options: LeptosOptions,
             pub pool: SqlitePool,
-            pub routes: Vec<RouteListing>,
+            pub routes: Vec<RouteListing>
         }
     }
 }
